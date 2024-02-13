@@ -1,0 +1,3 @@
+number of cycles = 100000; data structure = Apache Data Sketches Java HLL8 (p = 13)
+true distinct count; minimum memory size; average memory size; maximum memory size; minimum serialization size; average serialization size; maximum serialization size; relative distinct count estimation bias; relative distinct count estimation rmse; estimated memory MVP; estimated serialization MVP
+1000000; 8440; 8440.0; 8440; 8232; 8232.0; 8232; -7.681279887854856E-5; 0.011432162411079149; 8.82448166079501; 8.607006283372575

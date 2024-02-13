@@ -1,0 +1,218 @@
+//
+// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+//
+// This software and associated documentation files (the "Software")
+// are being made available by Dynatrace LLC for the sole purpose of
+// illustrating the implementation of certain algorithms which have
+// been published by Dynatrace LLC. Permission is hereby granted,
+// free of charge, to any person obtaining a copy of the Software,
+// to view and use the Software for internal, non-production,
+// non-commercial purposes only – the Software may not be used to
+// process live data or distributed, sublicensed, modified and/or
+// sold either alone or as part of or in combination with any other
+// software.
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+plugins {
+	id 'com.diffplug.spotless' version '6.25.0'
+}
+
+def figFiles = []
+
+def mvpFigFiles = [
+	"paper/mvp_martingale.pdf",
+	"paper/mvp_ml.pdf",
+	"paper/mvp_compressed_ml.pdf",
+	"paper/mvp_compressed_martingale.pdf"
+]
+
+task makeMvpCharts (type: Exec) {
+	inputs.files "python/preamble.py", "python/plot_mvp_charts.py", "python/mvp.py", "paper/symbols.tex"
+	outputs.files mvpFigFiles
+	commandLine 'python', "python/plot_mvp_charts.py"
+}
+figFiles +=mvpFigFiles
+
+def pythonScriptOutputFiles = [
+	"mvp",
+	"ml_theoretical_relative_standard_error_constants",
+	"martingale_theoretical_relative_standard_error_constants",
+	"ml_bias_correction_constants",
+	"ml_compressed_mvp_constants"
+]
+def constantCalculationTasks = []
+for(int i = 0; i < pythonScriptOutputFiles.size(); ++i) {
+	def s = pythonScriptOutputFiles[i]
+	def taskName = "calculate_constants_" + s
+	constantCalculationTasks += taskName
+	def outputFileName = 'results/constants/' + s + '.txt'
+	def inputFileName = 'python/' + s + '.py'
+	task "${taskName}"(type: Exec) {
+		doFirst {
+			standardOutput = new FileOutputStream(outputFileName)
+		}
+		outputs.files outputFileName
+		inputs.files inputFileName, "python/mvp.py"
+		commandLine 'python', inputFileName
+	}
+}
+
+
+
+def probDensitiesFigFiles = [
+	"paper/probability_densities.pdf"
+]
+task makeProbabilityDensityFigure (type: Exec) {
+	inputs.files "python/preamble.py", "python/probability_densities.py", "paper/symbols.tex"
+	outputs.files probDensitiesFigFiles
+	commandLine 'python', "python/probability_densities.py"
+}
+figFiles +=probDensitiesFigFiles
+
+
+def errorInputFiles = [
+	"results/error/exaloglog-estimation-error-t01-d09-p04.csv",
+	"results/error/exaloglog-estimation-error-t01-d09-p06.csv",
+	"results/error/exaloglog-estimation-error-t01-d09-p08.csv",
+	"results/error/exaloglog-estimation-error-t01-d09-p10.csv",
+	"results/error/exaloglog-estimation-error-t02-d16-p04.csv",
+	"results/error/exaloglog-estimation-error-t02-d16-p06.csv",
+	"results/error/exaloglog-estimation-error-t02-d16-p08.csv",
+	"results/error/exaloglog-estimation-error-t02-d16-p10.csv",
+	"results/error/exaloglog-estimation-error-t02-d20-p04.csv",
+	"results/error/exaloglog-estimation-error-t02-d20-p06.csv",
+	"results/error/exaloglog-estimation-error-t02-d20-p08.csv",
+	"results/error/exaloglog-estimation-error-t02-d20-p10.csv",
+	"results/error/exaloglog-estimation-error-t02-d24-p04.csv",
+	"results/error/exaloglog-estimation-error-t02-d24-p06.csv",
+	"results/error/exaloglog-estimation-error-t02-d24-p08.csv",
+	"results/error/exaloglog-estimation-error-t02-d24-p10.csv"
+]
+def errorFigFiles = [
+	"paper/estimation_error.pdf"
+]
+
+task makeErrorCharts (type: Exec) {
+	inputs.files errorInputFiles, "python/preamble.py", "python/mvp.py", "python/estimation_error_evaluation.py", "paper/symbols.tex"
+	outputs.files errorFigFiles
+	commandLine 'python', "python/estimation_error_evaluation.py"
+}
+figFiles +=errorFigFiles
+
+task pdfFigures {
+	group 'Main'
+	dependsOn makeMvpCharts, makeErrorCharts, makeProbabilityDensityFigure
+}
+
+task calculateConstants {
+	group 'Main'
+	dependsOn constantCalculationTasks
+}
+
+static def readPythonLicense(licenseName) {
+	File licenseFile = new File('licenses/' + licenseName + '.txt')
+	def line
+	def s = '#\n'
+	licenseFile.withReader { reader ->
+		while ((line = reader.readLine()) != null) {
+			s += '#'
+			if(!line.isEmpty()) {
+				s += ' '
+				s += line
+			}
+			s += '\n'
+		}
+	}
+	s += '#'
+	return s
+}
+
+static def readJavaLicense(licenseName) {
+	File licenseFile = new File('licenses/' + licenseName + '.txt')
+	def line
+	def s = '//\n'
+	licenseFile.withReader { reader ->
+		while ((line = reader.readLine()) != null) {
+			s += '//'
+			if(!line.isEmpty()) {
+				s += ' '
+				s += line
+			}
+			s += '\n'
+		}
+	}
+	s += '//'
+	return s
+}
+
+spotless {
+	def googleJavaFormatVersion = '1.19.2'
+	def eclipseCdtVersion = '11.1'
+	def blackVersion = '24.2.0'
+	def greclipseVersion = '4.29'
+	ratchetFrom 'origin/main'
+	apply plugin: 'groovy'
+	groovyGradle {
+		target '*.gradle','java/*.gradle'
+		greclipse(greclipseVersion)
+		licenseHeader readJavaLicense('license'), 'plugins'
+	}
+	python {
+		target 'python/**/*.py'
+		black(blackVersion)
+		licenseHeader readPythonLicense('license'), '(import|from)'
+	}
+	cpp {
+		target 'c++/empiricalMvpComputation.cpp'
+		eclipseCdt(eclipseCdtVersion)
+		licenseHeader readJavaLicense('license')
+	}
+	java {
+		target 'java/**/*.java'
+		importOrder()
+		removeUnusedImports()
+		googleJavaFormat(googleJavaFormatVersion)
+		licenseHeader readJavaLicense('license')
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+task buildEmpiricalMVPComputationCpp (type: Exec) {
+	workingDir 'c++'
+	outputs.files "c++/empiricalMvpComputation"
+	commandLine "g++", "-std=c++20", "-fopenmp", "-Wall", "-O3", "empiricalMvpComputation.cpp", "-o", "empiricalMvpComputation"
+	standardOutput = new ByteArrayOutputStream()
+	outputs.upToDateWhen { false }
+}
+
+task runEmpiricalMVPComputationCpp (type: Exec) {
+	inputs.files "c++/empiricalMvpComputation"
+	outputs.files \
+			'results/comparison-empirical-mvp/HyperLogLogLog (p = 13).csv'
+	standardOutput = new ByteArrayOutputStream()
+	commandLine "c++/empiricalMvpComputation"
+	dependsOn buildEmpiricalMVPComputationCpp
+}
+
+task runEmpiricalMVPComputationJava {
+	dependsOn ':java:runEmpiricalMVPComputation'
+}
+
+task runEmpiricalMVPComputation {
+	group 'Main'
+	dependsOn runEmpiricalMVPComputationCpp, runEmpiricalMVPComputationJava
+}

@@ -1,0 +1,3 @@
+number of cycles = 100000; data structure = Apache Data Sketches Java CPC (p = 12)
+true distinct count; minimum memory size; average memory size; maximum memory size; minimum serialization size; average serialization size; maximum serialization size; relative distinct count estimation bias; relative distinct count estimation rmse; estimated memory MVP; estimated serialization MVP
+1000000; 4744; 5255.99488; 5256; 2404; 2489.38816; 2580; 8.353322537252148E-6; 0.010828230352545685; 4.930147272747051; 2.3350574968278504

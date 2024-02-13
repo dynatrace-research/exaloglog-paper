@@ -1,0 +1,149 @@
+//
+// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+//
+// This software and associated documentation files (the "Software")
+// are being made available by Dynatrace LLC for the sole purpose of
+// illustrating the implementation of certain algorithms which have
+// been published by Dynatrace LLC. Permission is hereby granted,
+// free of charge, to any person obtaining a copy of the Software,
+// to view and use the Software for internal, non-production,
+// non-commercial purposes only – the Software may not be used to
+// process live data or distributed, sublicensed, modified and/or
+// sold either alone or as part of or in combination with any other
+// software.
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+plugins {
+	id 'java'
+	id 'jacoco'
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'com.dynatrace.hash4j:hash4j:0.17.0'
+	implementation group: 'org.hipparchus', name: 'hipparchus-stat', version: '3.0'
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.10.2'
+	testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.25.3'
+	testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.10.2'
+	implementation 'org.apache.datasketches:datasketches-java:5.0.1'
+	implementation group: 'org.openjdk.jol', name: 'jol-core', version: '0.17'
+	testImplementation group: 'com.google.guava', name: 'guava', version: '33.0.0-jre'
+}
+
+test {
+	useJUnitPlatform()
+}
+
+java {
+	toolchain {
+		languageVersion.set(JavaLanguageVersion.of(21))
+	}
+	withJavadocJar()
+	withSourcesJar()
+}
+
+sourceSets {
+	main
+	test
+}
+
+
+task runEmpiricalMVPComputation(type: JavaExec) {
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'com.dynatrace.exaloglogpaper.EmpiricalMVPComputation'
+	jvmArgs '-Xmx16g'
+
+	outputs.files "../results/comparison-empirical-mvp/Apache Data Sketches Java CPC (p = 12).csv",
+			"../results/comparison-empirical-mvp/Apache Data Sketches Java HLL4 (p = 13).csv",
+			"../results/comparison-empirical-mvp/Apache Data Sketches Java HLL6 (p = 13).csv",
+			"../results/comparison-empirical-mvp/Apache Data Sketches Java HLL8 (p = 13).csv",
+			"../results/comparison-empirical-mvp/Hash4j HyperLogLog (p = 13).csv",
+			"../results/comparison-empirical-mvp/Hash4j UltraLogLog (p = 12).csv",
+			"../results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 0, p = 13).csv",
+			"../results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 1, p = 12).csv",
+			"../results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 2, p = 12).csv",
+			"../results/comparison-empirical-mvp/ExaLogLog (t = 1, d = 9, p = 11).csv",
+			"../results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 16, p = 10).csv",
+			"../results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 20, p = 10).csv",
+			"../results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 24, p = 10).csv"
+}
+
+
+def pValuesErrorSimulation = [4, 6, 8, 10]
+def tValuesErrorSimulation = [1, 2, 2, 2]
+def dValuesErrorSimulation = [9, 16, 20, 24]
+def errorSimulationTasks = []
+for(int i = 0; i < Math.min(tValuesErrorSimulation.size(), dValuesErrorSimulation.size()); ++i) {
+	def t = tValuesErrorSimulation[i]
+	def d = dValuesErrorSimulation[i]
+	for (p in pValuesErrorSimulation) {
+		def sketchTaskName = "simulateEstimationErrors" + "T" + String.format("%02d", t) + "D" + String.format("%02d", d) + "P" + String.format("%02d", p)
+		def outputFileName = '../results/error/exaloglog-estimation-error' + '-t' + String.format("%02d", t) + '-d' + String.format("%02d", d) + '-p' + String.format("%02d", p) + '.csv'
+		task "${sketchTaskName}"(type: JavaExec) {
+			outputs.files outputFileName
+			classpath = sourceSets.test.runtimeClasspath
+			mainClass = 'com.dynatrace.exaloglogpaper.ExaLogLogEstimationErrorSimulation'
+			args = [
+				t.toString(),
+				d.toString(),
+				p.toString(),
+				outputFileName
+			]
+			jvmArgs = ['-Xmx16g']
+		}
+		errorSimulationTasks.add(sketchTaskName)
+	}
+}
+task "simulateEstimationErrors" {
+	group "Main"
+	dependsOn errorSimulationTasks
+}
+
+jacoco {
+	toolVersion = '0.8.11'
+}
+
+jacocoTestReport {
+	reports {
+		xml.required = true
+		csv.required = true
+	}
+}
+
+jacocoTestCoverageVerification {
+	violationRules {
+		rule {
+			limit {
+				minimum = 1.0
+				counter = 'LINE'
+			}
+			limit {
+				minimum = 1.0
+				counter = 'BRANCH'
+			}
+		}
+	}
+}
+
+
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
+	maxHeapSize '8g'
+}
+
+tasks.test.finalizedBy jacocoTestReport
+check.dependsOn jacocoTestCoverageVerification

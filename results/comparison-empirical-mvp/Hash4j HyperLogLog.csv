@@ -1,0 +1,3 @@
+number of cycles = 100000; data structure = Hash4j HyperLogLog
+true distinct count; minimum memory size; average memory size; maximum memory size; minimum serialization size; average serialization size; maximum serialization size; relative distinct count estimation bias; relative distinct count estimation rmse; estimated memory MVP; estimated serialization MVP
+1000000; 6184; 6184.0; 6184; 6144; 6144.0; 6144; -1.6286617114826552E-5; 0.011363176190606115; 6.3879123607206205; 6.346593393316219
