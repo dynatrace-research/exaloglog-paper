@@ -1,6 +1,6 @@
 # ExaLogLog: Space-Efficient and Practical Approximate Distinct Counting up to the Exa-Scale
 
-This repository contains the source code to reproduce the results and figures presented in the paper "ExaLogLog: Space-Efficient and Practical Approximate Distinct Counting up to the Exa-Scale".
+This repository contains the source code to reproduce the results and figures presented in the paper ["ExaLogLog: Space-Efficient and Practical Approximate Distinct Counting up to the Exa-Scale"](https://arxiv.org/abs/2402.13726).
 
 ## Abstract
 This work introduces ExaLogLog, a new data structure for approximate distinct counting, which has the same practical properties as the popular HyperLogLog algorithm. It is commutative, idempotent, mergeable, reducible, has a constant-time insert operation, and supports distinct counts up to the exa-scale. At the same time, as theoretically derived and experimentally verified, it requires 43% less space to achieve the same estimation error.
