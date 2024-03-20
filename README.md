@@ -28,7 +28,7 @@ This work introduces ExaLogLog, a new data structure for approximate distinct co
    ```
    ./gradlew calculateConstants
    ```
-   The ouput can then be found in the `results/constants` folder.
+   The output can then be found in the `results/constants` folder.
 7. To (re-)generate all figures in the `paper` directory execute the `pdfFigures` task (takes ~1min):
    ```
    ./gradlew pdfFigures
