@@ -159,7 +159,7 @@ static def readJavaLicense(licenseName) {
 spotless {
 	def googleJavaFormatVersion = '1.19.2'
 	def eclipseCdtVersion = '11.1'
-	def blackVersion = '24.2.0'
+	def blackVersion = '24.4.0'
 	def greclipseVersion = '4.29'
 	ratchetFrom 'origin/main'
 	apply plugin: 'groovy'
