@@ -344,4 +344,12 @@ class DistinctCountUtilTest {
     assertThat(DistinctCountUtil.unsignedLongToDouble(1)).isOne();
     assertThat(DistinctCountUtil.unsignedLongToDouble(0x8000000000000000L)).isEqualTo(0x1p63);
   }
+
+  @Test
+  void testIsValidToken() {
+    assertThat(isValidToken(0, 7)).isTrue();
+    assertThat(isValidToken(10000, 1)).isFalse();
+    assertThat(isValidToken(0xFFFFFFFF, 1)).isFalse();
+    assertThat(isValidToken(0x3F, 2)).isFalse();
+  }
 }
