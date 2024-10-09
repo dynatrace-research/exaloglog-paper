@@ -28,6 +28,8 @@ package com.dynatrace.exaloglogpaper;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 class DistinctCountUtil {
 
   private DistinctCountUtil() {}
@@ -35,10 +37,6 @@ class DistinctCountUtil {
   static IllegalArgumentException getUnexpectedStateLengthException() {
     return new IllegalArgumentException("unexpected state length!");
   }
-
-  private static final double C0 = -1. / 3.;
-  private static final double C1 = 1. / 45.;
-  private static final double C2 = 1. / 472.5;
 
   /**
    * Maximizes the expression
@@ -51,9 +49,6 @@ class DistinctCountUtil {
    * or {@code n >= 64} the behavior of this function is not defined. {@code a} must be either zero
    * or greater than or equal to 2^{-64}.
    *
-   * <p>This algorithm is based on Algorithm 8 described in Ertl, Otmar. "New cardinality estimation
-   * algorithms for HyperLogLog sketches." arXiv preprint arXiv:1702.01284 (2017).
-   *
    * @param a parameter a
    * @param b parameter b
    * @param n parameter n
@@ -63,158 +58,101 @@ class DistinctCountUtil {
    */
   static double solveMaximumLikelihoodEquation(
       double a, int[] b, int n, double relativeErrorLimit) {
-    // Maximizing the expression
-    //
-    // e^{-x*a} * (1 - e^{-x})^b[0] * (1 - e^{-x/2})^b[1] * (1 - e^{-x/2^2})^b[2] * ...
-    //
-    // corresponds to maximizing the function
-    //
-    // f(x) := -x*a + b[0]*ln(1 - e^{-x}) + b[1]*ln(1 - e^{-x/2}) + b[2]*ln(1 - e^{-x/2^2}) + ...
-    //
-    // The first derivative is given by
-    // f'(x) = -a + b[0]*1/(e^{x} - 1) + b[1]/2 * 1/(e^{x/2} - 1) + b[2]/2^2 * 1/(e^{x/2^2} - 1) +
-    // ...
-    //
-    // We need to solve f'(x) = 0 which is equivalent to finding the root of
-    //
-    // g(x) = -(b[0] + b[1] + ...) + a * x + b[0] * h(x) + b[1] * h(x/2) + b[2]* h(x/2^2) + ...
-    //
-    // with h(x) :=  1 - x / (e^x - 1) which is a concave and monotonically increasing function.
-    //
-    // Applying Jensen's inequality gives for the root:
-    //
-    // 0 <= -(b[0] + b[1] + ...) + a * x + (b[0] + b[1] + ...)
-    //                           * h(x * (b[0] + b[1]/2 + b[2]/2^2 + ...) / (b[0] + b[1] + ...) )
-    //      -(b[0] + b[1] + ...) * h(x * (b[0] + b[1]/2 + b[2]/2^2 + ...) / (b[0] + b[1] + ...) )
-    //      +(b[0] + b[1] + ...) <= a * x
-    //
-    // (b[0] + b[1]/2 + b[2]/2^2 + ...) / ( exp(x * (b[0] + b[1]/2 + b[2]/2^2 + ...) /
-    //                                                             (b[0] + b[1] + ...)) - 1) <= a
-    //
-    // exp(x * (b[0] + b[1]/2 + b[2]/2^2 + ...) / (b[0] + b[1] + ...))
-    // >= 1 + (b[0] + b[1]/2 + b[2]/2^2 + ...) / a
-    //
-    // x >= ln(1 + (b[0] + b[1]/2 + b[2]/2^2 + ...) / a ) * (b[0] + b[1] + ...) /
-    //                                                           (b[0] + b[1]/2 + b[2]/2^2 + ...)
-    //
-    // Using the inequality ln(1 + y) >= 2*y / (y+2) we get
-    //
-    // x >= 2 * ((b[0] + b[1]/2 + b[2]/2^2 + ...) / a) / ((b[0] + b[1]/2 + b[2]/2^2 + ...) / a + 2)
-    //                                     * (b[0] + b[1] + ...) / (b[0] + b[1]/2 + b[2]/2^2 + ...)
-    //
-    // x >= (b[0] + b[1] + ...) / (0.5 * (b[0] + b[1]/2 + b[2]/2^2 + ...) + a)
-    //
-    // Upper bound:
-    //
-    // k_max is the largest index k for which b[k] > 0
-    //
-    // 0 >= -(b[0] + b[1] + ...) + a * x
-    //     + b[0] * h(x/2^k_max) + b[1] * h(x/2^k_max) + b[2] * h(x/2^k_max) + ...
-    //
-    // 0 >= -(b[0] + b[1] + ...) + a * x + (b[0] + b[1] + b[2] + ...) * h(x/2^k_max)
-    // (b[0] + b[1] + ...) * (1 - h(x/2^k_max)) / a >= x
-    //
-    // x <= (b[0] + b[1] + ...) * (1 - h(x/2^k_max)) / a
-    //
-    // x <= 2^k_max * ln(1 + (b[0] + b[1] + ...) / (a * 2^k_max))
-    //
-    // Using ln(1 + x) <= x
-    //
-    // x <= (b[0] + b[1] + ...) / a
-
-    if (a == 0.) return Double.POSITIVE_INFINITY;
-
-    int kMax = n;
-    while (kMax >= 0 && b[kMax] == 0) {
-      --kMax;
-    }
-    if (kMax < 0) {
-      // all elements in b are 0
-      return 0.;
-    }
-
-    int kMin = kMax;
-    int t = b[kMax];
-    long s1 = t;
-    double s2 = Double.longBitsToDouble(Double.doubleToRawLongBits(t) + ((long) kMax << 52));
-    for (int k = kMax - 1; k >= 0; --k) {
-      t = b[k];
-      if (t > 0) {
-        s1 += t;
-        s2 += Double.longBitsToDouble(Double.doubleToRawLongBits(t) + ((long) k << 52));
-        kMin = k;
-      }
-    }
-
-    double gPrevious = 0;
-    double x;
-    if (s2 <= 1.5 * a) {
-      x = s1 / (0.5 * s2 + a);
-    } else {
-      x = Math.log1p(s2 / a) * (s1 / s2);
-    }
-
-    double deltaX = x;
-    while (deltaX > x * relativeErrorLimit) {
-
-      long rawX = Double.doubleToRawLongBits(x);
-      int kappa = (int) ((rawX & 0x7FF0000000000000L) >> 52) - 1021;
-      double xPrime =
-          Double.longBitsToDouble(
-              rawX - ((Math.max(kMax, kappa) + 1L) << 52)); // xPrime in [0, 0.25]
-
-      double xPrime2 = xPrime * xPrime;
-      double h = xPrime + xPrime2 * (C0 + xPrime2 * (C1 - xPrime2 * C2));
-      for (int k = kappa - 1; k >= kMax; --k) {
-        double hPrime = 1. - h;
-        h = (xPrime + h * hPrime) / (xPrime + hPrime);
-        xPrime += xPrime;
-      }
-      double g = b[kMax] * h;
-      for (int k = kMax - 1; k >= kMin; --k) {
-        double hPrime = 1. - h;
-        h = (xPrime + h * hPrime) / (xPrime + hPrime);
-        xPrime += xPrime;
-        g += b[k] * h;
-      }
-      g += x * a;
-
-      if (gPrevious < g && g <= s1) {
-        deltaX *= (g - s1) / (gPrevious - g);
-      } else {
-        deltaX = 0;
-      }
-      x += deltaX;
-      gPrevious = g;
-    }
-    return x;
+    return solveMaximumLikelihoodEquation(a, b, n, relativeErrorLimit, null);
   }
 
-  static int computeToken(long hashValue) {
-    int idx = (int) (hashValue & 0x3FFFFFFL);
-    int nlz = Long.numberOfLeadingZeros(hashValue | 0x3FFFFFFL);
+  static double solveMaximumLikelihoodEquation(
+      double a, int[] b, int n, double relativeErrorLimit, AtomicLong iterationCounter) {
+
+    long sigma0 = 0;
+    double sigma1 = 0;
+    int uMin = -1;
+    int uMax = 0;
+    for (int j = 0; j <= n; ++j) {
+      int bj = b[j];
+      if (bj > 0) {
+        if (uMin < 0) uMin = j;
+        uMax = j;
+        sigma0 += bj;
+        sigma1 += Double.longBitsToDouble(Double.doubleToRawLongBits(bj) - ((long) j << 52));
+      }
+    }
+    if (uMin < 0) return 0;
+
+    final double powUMax = pow2(uMax);
+    sigma1 *= powUMax;
+    final double aPow = a * powUMax;
+    double x = sigma1 / aPow;
+
+    if (uMin < uMax) {
+      x = Math.expm1(Math.log1p(x) * (sigma0 / sigma1));
+
+      while (true) { // Newton iteration
+        if (iterationCounter != null) iterationCounter.incrementAndGet();
+        double lambda = 1;
+        double eta = 0;
+        double phi = b[uMax];
+        double psi = 0;
+
+        double y = x; // x could be +inf, if a was 0
+        int u = uMax;
+        while (true) {
+          u -= 1;
+          double yPlus2 = 2. + y; // is +inf, if x = +inf
+          double z = 2. / yPlus2; // is always in range [0,1], is 0, if x = +inf
+          lambda *= z; // is 0, if x = +inf
+          eta =
+              eta * (2. - z)
+                  + (1.
+                      - z); // eta is increasing and will never overflow as the number of iterations
+          // is limited, eta <= 2^(uMax-u+1)-1
+          double t = b[u] * lambda;
+          phi += t;
+          psi += t * eta;
+          if (u <= uMin) break;
+          y *= yPlus2;
+        }
+
+        double xPrime = aPow * x;
+        if (!(phi > xPrime)) break;
+        double eps = (phi - xPrime) / (psi + xPrime);
+        double oldX = x;
+        x += x * eps;
+        if (eps <= relativeErrorLimit || !(x > oldX)) break;
+      }
+    }
+    return Math.log1p(x) * powUMax;
+  }
+
+  static int computeToken(long hashValue, int tokenParameter) {
+    long mask = 0xFFFFFFFFFFFFFFFFL >>> -tokenParameter;
+    int idx = (int) (hashValue & mask);
+    int nlz = Long.numberOfLeadingZeros(hashValue | mask);
     return (idx << 6) | nlz;
   }
 
-  static long reconstructHash(int token) {
+  static long reconstructHash(int token, int tokenParameter) {
     @SuppressWarnings("IntLongMath")
     long idx = token >>> 6;
-    return ((0x3FFFFFFFFFL >>> token) << 26) | idx;
+    return ((0xFFFFFFFFFFFFFFFFL >>> tokenParameter >>> token) << tokenParameter) | idx;
   }
+
+  static final int TOKEN_PARAMETER_MAX = 26;
+  static final int TOKEN_PARAMETER_MIN = 1;
 
   /**
    * An iterable over hash tokens.
    *
-   * <p>A 32-bit hash token is computed from a 64-bit hash value. It stores 26 bits of the hash
-   * value in the most significant part of its 32 bits. The remaining 6 bits are used to store the
-   * number of leading zeros of the remaining 38 bits of the hash value, which can be in the range
-   * [0, 38].
+   * <p>A (v+6)-bit hash token is computed from a 64-bit hash value. It stores v bits of the hash
+   * value in the upper 26 bits. The remaining 6 bits are used to store the number of leading zeros
+   * of the remaining (64 - v) bits of the hash value, which can be in the range [0, 64 - v]. Here v
+   * denotes the token parameter which must be in the range [1,26].
    *
    * <p>Implementations of this interface must ensure that the iteration over tokens is ordered,
    * which means that tokens with the same most significant bits are output one after the other and
    * not interleaved with tokens with different most significant bits. However, it is allowed to
-   * output invalid tokens, where the lower 6 bits represent a value greater than 38, at any time as
-   * it is expected that they are ignored during later processing.
+   * output invalid tokens at any time as it is expected that they are ignored during later
+   * processing. See {@link #isValidToken(int, int)} for a definition of a valid token.
    */
   interface TokenIterable {
 
@@ -239,8 +177,8 @@ class DistinctCountUtil {
     /**
      * Returns the next token.
      *
-     * <p>Invalid token may be returned, which can be identified using {@link #isValidToken(int)}.
-     * Invalid tokens are expected to be ignored during further processing.
+     * <p>Invalid token may be returned, which can be identified using {@link #isValidToken(int,
+     * int)}. Invalid tokens are expected to be ignored during further processing.
      *
      * @return the next token
      */
@@ -250,18 +188,18 @@ class DistinctCountUtil {
   /**
    * Returns {@code true}, if the token is valid.
    *
-   * <p>A token is valid if the value of its least significant 6 bits does not exceed 38.
+   * <p>A token is valid if the (unsigned) value is in the range of [0, 2^(6+v)-1] and the least
+   * significant 6 bits does not exceed (64 - v) where v denotes the token parameter.
    *
    * @param token the token
+   * @param token the token parameter, must be in the range [1,26]
    * @return true, if the token is valid
    */
-  static boolean isValidToken(int token) {
+  static boolean isValidToken(int token, int tokenParameter) {
     int nlz = token & 0x3f;
-    return nlz <= MAX_NLZ_IN_TOKEN;
+    return ((token >>> 6 >>> tokenParameter) == 0) && (nlz <= 64 - tokenParameter);
   }
 
-  private static final int MAX_NLZ_IN_TOKEN = 38;
-  private static final double RELATIVE_ERROR_LIMIT = 1e-6;
   private static final int INVALID_TOKEN_INDEX = 0xFFFFFFFF;
 
   /**
@@ -270,19 +208,28 @@ class DistinctCountUtil {
    * @param tokenIterable a iterable for tokens
    * @return the estimated distinct count
    */
-  static double estimateDistinctCountFromTokens(TokenIterable tokenIterable) {
+  static double estimateDistinctCountFromTokens(TokenIterable tokenIterable, int tokenParameter) {
+    return estimateDistinctCountFromTokens(tokenIterable, tokenParameter, null);
+  }
 
+  static double estimateDistinctCountFromTokens(
+      TokenIterable tokenIterable, int tokenParameter, AtomicLong iterationCounter) {
     requireNonNull(tokenIterable);
 
     TokenIterator tokenIterator = tokenIterable.iterator();
 
-    int[] b = new int[MAX_NLZ_IN_TOKEN];
+    int maxNlzInTokenMinus1 = 63 - tokenParameter;
+    long z = 1L << maxNlzInTokenMinus1;
+
+    long a = 0; // corresponds to 2^64
+    int[] b = new int[63];
 
     int currentIdx = INVALID_TOKEN_INDEX;
     long currentFlags = 0;
+    int maxNonZeroIndex = -1;
     while (tokenIterator.hasNext()) {
       int token = tokenIterator.nextToken();
-      if (!isValidToken(token)) continue;
+      if (!isValidToken(token, tokenParameter)) continue;
       int idx = token >>> 6;
       if (currentIdx != idx) {
         currentFlags = 0;
@@ -291,31 +238,33 @@ class DistinctCountUtil {
       long mask = (1L << token);
       if ((currentFlags & mask) == 0L) {
         currentFlags |= mask;
-        int nlz = token & 0x3f;
-        if (nlz < MAX_NLZ_IN_TOKEN) {
-          b[nlz] += 1;
-        } else {
-          b[MAX_NLZ_IN_TOKEN - 1] += 1;
-        }
+        int j = Math.min(token & 0x3f, maxNlzInTokenMinus1);
+        b[j] += 1;
+        a -= z >>> j;
+        if (j > maxNonZeroIndex) maxNonZeroIndex = j;
       }
     }
 
-    double a = 0x1p27;
-    int maxNonZeroIndex = 0;
-    for (int i = 0; i < MAX_NLZ_IN_TOKEN; ++i) {
-      if (b[i] != 0) {
-        a -= b[i] * Double.longBitsToDouble((0x3FFL - i) << 52);
-        maxNonZeroIndex = i;
-      }
+    if (maxNonZeroIndex < 0) {
+      // implies that all b[i] are zero
+      return 0;
     }
     return DistinctCountUtil.solveMaximumLikelihoodEquation(
-            a, b, maxNonZeroIndex, RELATIVE_ERROR_LIMIT)
-        * 0x1p27;
+            unsignedLongToDouble(a) * pow2(-maxNlzInTokenMinus1),
+            b,
+            maxNonZeroIndex,
+            0.,
+            iterationCounter)
+        * pow2(tokenParameter + 1);
   }
 
   static double unsignedLongToDouble(long l) {
     double d = l & 0x7fffffffffffffffL;
-    if (l < 0) d += 0x1.0p63;
+    if (l < 0) d += 0x1p63;
     return d;
+  }
+
+  static double pow2(int x) {
+    return Double.longBitsToDouble((x + 1023L) << 52);
   }
 }

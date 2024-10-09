@@ -72,7 +72,7 @@ public class ExaLogLog_2_20Test extends ExaLogLogTest {
       x.putDouble(exaLogLog.getDistinctCountEstimate());
     }
     long hash = x.getAsLong();
-    assertThat(hash).isEqualTo(0x54257ae9db40a491L);
+    assertThat(hash).isEqualTo(0x57346f281aac1cecL);
   }
 
   @Override

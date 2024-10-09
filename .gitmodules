@@ -1,0 +1,3 @@
+[submodule "c++/SpikeSketch"]
+	path = c++/SpikeSketch
+	url = https://github.com/duyang92/SpikeSketch

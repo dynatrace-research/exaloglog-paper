@@ -5,39 +5,50 @@
 % SYMBOLS
 \newcommand*{\symDefine}[2]{\newcommand*{#1}{#2}}
 
-\symDefine{\symBitwiseAnd}{\mathrel{\&}}
-\symDefine{\symBitwiseOr}{\mathrel{|}}
+
 \symDefine{\symMVP}{\text{MVP}}
 \symDefine{\symUpdateEvent}{A}
 \symDefine{\symMasked}{a}
+\symDefine{\symThreshold}{a}
 \symDefine{\symBase}{b}
 \symDefine{\symBiasCorrectionFactorConstant}{c}
+\symDefine{\symSomeConstant}{c}
 \symDefine{\symNumExtraBits}{d}
+\symDefine{\symFunc}{f}
+\symDefine{\symOtherFunc}{g}
 \symDefine{\symRegMartingale}{h}
 \symDefine{\symHashBit}{h}
 \symDefine{\symRegAddr}{i}
 \symDefine{\symIndexJ}{j}
+\symDefine{\symIndexL}{l}
 \symDefine{\symUpdateVal}{k}
 \symDefine{\symIndexBit}{l}
 \symDefine{\symNumReg}{m}
 \symDefine{\symCardinality}{n}
-\symDefine{\symCardinalityMax}{\symCardinality_\text{max}}
-\symDefine{\symCardinalityEstimatorML}{\symCardinalityEstimator_\text{ML}}
+\symDefine{\symCardinalityMax}{\symCardinality_\text{\normalfont max}}
+\symDefine{\symCardinalityEstimatorML}{\symCardinalityEstimator_\text{\normalfont ML}}
 \symDefine{\symCardinalityEstimator}{\hat{\symCardinality}}
-\symDefine{\symCardinalityEstimatorMartingale}{\symCardinalityEstimator_\text{martingale}}
+\symDefine{\symCardinalityEstimatorMartingale}{\symCardinalityEstimator_\text{\normalfont martingale}}
 \symDefine{\symPrecision}{p}
 \symDefine{\symProbability}{\Pr}
 \symDefine{\symBitsForMax}{q}
 \symDefine{\symRegister}{r}
-\symDefine{\symIndexS}{s}
+\symDefine{\symHashTokenBit}{s}
+\symDefine{\symShift}{s}
 \symDefine{\symExtraBits}{t}
+\symDefine{\symTimeIndex}{t}
+\symDefine{\symTokenSet}{T}
 \symDefine{\symMaxUpdateVal}{u}
+\symDefine{\symMaxUpdateValMin}{{\symMaxUpdateVal_\text{\normalfont min}}}
+\symDefine{\symMaxUpdateValMax}{{\symMaxUpdateVal_\text{\normalfont max}}}
+\symDefine{\symHashTokenParameter}{v}
+\symDefine{\symNumBits}{v}
+\symDefine{\symToken}{w}
 \symDefine{\symX}{x}
+\symDefine{\symXOld}{\symX_\text{\normalfont old}}
+\symDefine{\symXZero}{\hat{\symX}}
 \symDefine{\symY}{y}
 \symDefine{\symZ}{z}
-\symDefine{\symShift}{s}
-\symDefine{\symNumBits}{v}
-\symDefine{\symThreshold}{w}
 
 % calligraphic
 \symDefine{\symLikelihood}{\mathcal{L}}
@@ -49,15 +60,27 @@
 \symDefine{\symAlphaContribFunc}{\omega}
 \symDefine{\symLikelihoodFuncExponentOne}{\alpha}
 \symDefine{\symLikelihoodFuncExponentTwo}{\beta}
+\symDefine{\symLikelihoodFuncExponentTwoSum}{\sigma_0}
+\symDefine{\symLikelihoodFuncExponentTwoPow}{\sigma_1}
 \symDefine{\symGammaFunc}{\Gamma}
 \symDefine{\symDensity}{\rho}
-\symDefine{\symDensityUpdate}{\symDensity_\text{update}}
-\symDefine{\symDensityRegister}{\symDensity_\text{reg}}
+\symDefine{\symDensityUpdate}{\symDensity_\text{\normalfont update}}
+\symDefine{\symDensityRegister}{\symDensity_\text{\normalfont reg}}
+\symDefine{\symDensityToken}{\symDensity_\text{\normalfont token}}
 \symDefine{\symZetaFunc}{\zeta}
 \symDefine{\symStateChangeProbability}{\mu}
 \symDefine{\symDelta}{\Delta}
+\symDefine{\symSumA}{\varphi}
+\symDefine{\symSumB}{\psi}
+\symDefine{\symFactorOne}{\lambda}
+\symDefine{\symFactorTwo}{\eta}
 
 % operators
 \DeclareMathOperator*{\symVariance}{Var}
 \DeclareMathOperator*{\symExpectation}{\mathbb{E}}
 \DeclareMathOperator*{\symNLZ}{nlz}
+\DeclareMathOperator*{\symExpMinusOne}{expm1}
+\DeclareMathOperator*{\symLogPlusOne}{log1p}
+
+\symDefine{\symBitwiseAnd}{\mathrel{\&}}
+\symDefine{\symBitwiseOr}{\mathrel{|}}

@@ -37,7 +37,7 @@ def pdf_exaloglog(t, k):
 
 
 fig, ax = plt.subplots(1, 2)
-fig.set_size_inches(6, 2.5)
+fig.set_size_inches(6, 1.8)
 
 
 def plot_x(ax, t):
@@ -81,7 +81,7 @@ def plot_x(ax, t):
 plot_x(ax[0], t=1)
 plot_x(ax[1], t=2)
 
-fig.subplots_adjust(left=0.09, bottom=0.09, right=0.992, top=0.985, wspace=0.3)
+fig.subplots_adjust(left=0.09, bottom=0.11, right=0.992, top=0.985, wspace=0.3)
 fig.savefig(
     "paper/probability_densities.pdf",
     format="pdf",

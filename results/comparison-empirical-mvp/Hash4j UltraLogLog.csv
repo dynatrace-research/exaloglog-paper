@@ -1,3 +1,0 @@
-number of cycles = 100000; data structure = Hash4j UltraLogLog
-true distinct count; minimum memory size; average memory size; maximum memory size; minimum serialization size; average serialization size; maximum serialization size; relative distinct count estimation bias; relative distinct count estimation rmse; estimated memory MVP; estimated serialization MVP
-1000000; 4128; 4128.0; 4128; 4096; 4096.0; 4096; -4.593918715978882E-5; 0.01184556550829992; 4.6338425511100905; 4.597921291023965

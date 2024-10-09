@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.DoubleStream;
 
 public final class TestUtils {
 
@@ -175,5 +176,19 @@ public final class TestUtils {
       }
     }
     Arrays.sort(transitions, comparing(Transition::getDistinctCount));
+  }
+
+  static double calculateBias(double[] empiricalValues, double trueValue) {
+    return DoubleStream.of(empiricalValues).map(x -> x - trueValue).average().getAsDouble()
+        / trueValue;
+  }
+
+  static double calculateRmse(double[] empiricalValues, double trueValue) {
+    return Math.sqrt(
+            DoubleStream.of(empiricalValues)
+                .map(x -> (x - trueValue) * (x - trueValue))
+                .average()
+                .getAsDouble())
+        / trueValue;
   }
 }

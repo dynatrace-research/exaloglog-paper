@@ -103,16 +103,35 @@ def errorFigFiles = [
 	"paper/estimation_error.pdf"
 ]
 
-task makeErrorCharts (type: Exec) {
+task makeExaloglogErrorCharts (type: Exec) {
 	inputs.files errorInputFiles, "python/preamble.py", "python/mvp.py", "python/estimation_error_evaluation.py", "paper/symbols.tex"
 	outputs.files errorFigFiles
 	commandLine 'python', "python/estimation_error_evaluation.py"
 }
 figFiles +=errorFigFiles
 
+def tokenErrorInputFiles = [
+	"results/error/token-estimation-error-06.csv",
+	"results/error/token-estimation-error-08.csv",
+	"results/error/token-estimation-error-10.csv",
+	"results/error/token-estimation-error-12.csv",
+	"results/error/token-estimation-error-18.csv",
+	"results/error/token-estimation-error-26.csv"
+]
+def tokenErrorFigFiles = [
+	"paper/token_estimation_error.pdf"
+]
+task makeTokenErrorCharts (type: Exec) {
+	inputs.files tokenErrorInputFiles, "python/preamble.py", "python/token_estimation_error_evaluation.py", "paper/symbols.tex"
+	outputs.files tokenErrorFigFiles
+	commandLine 'python', "python/token_estimation_error_evaluation.py"
+}
+figFiles +=tokenErrorFigFiles
+
+
 task pdfFigures {
 	group 'Main'
-	dependsOn makeMvpCharts, makeErrorCharts, makeProbabilityDensityFigure
+	dependsOn makeMvpCharts, makeExaloglogErrorCharts, makeProbabilityDensityFigure, makeTokenErrorCharts
 }
 
 task calculateConstants {
@@ -159,12 +178,12 @@ static def readJavaLicense(licenseName) {
 spotless {
 	def googleJavaFormatVersion = '1.19.2'
 	def eclipseCdtVersion = '11.1'
-	def blackVersion = '24.4.0'
+	def blackVersion = '24.4.2'
 	def greclipseVersion = '4.29'
 	ratchetFrom 'origin/main'
 	apply plugin: 'groovy'
 	groovyGradle {
-		target '*.gradle','java/*.gradle'
+		target 'build.gradle','java/build.gradle'
 		greclipse(greclipseVersion)
 		licenseHeader readJavaLicense('license'), 'plugins'
 	}
@@ -194,7 +213,7 @@ repositories {
 task buildEmpiricalMVPComputationCpp (type: Exec) {
 	workingDir 'c++'
 	outputs.files "c++/empiricalMvpComputation"
-	commandLine "g++", "-std=c++20", "-fopenmp", "-Wall", "-O3", "empiricalMvpComputation.cpp", "-o", "empiricalMvpComputation"
+	commandLine "g++", "-std=c++20", "-fopenmp", "-Wall", "-O3", "-Wl,--allow-multiple-definition", "empiricalMvpComputation.cpp", "SpikeSketch/SpikeSketch/main_extend.cpp", "SpikeSketch/SpikeSketch/utils/MurmurHash3.cpp", "SpikeSketch/SpikeSketch/impl/ss_query1.cpp", "-o", "empiricalMvpComputation"
 	standardOutput = new ByteArrayOutputStream()
 	outputs.upToDateWhen { false }
 }
@@ -202,7 +221,21 @@ task buildEmpiricalMVPComputationCpp (type: Exec) {
 task runEmpiricalMVPComputationCpp (type: Exec) {
 	inputs.files "c++/empiricalMvpComputation"
 	outputs.files \
-			'results/comparison-empirical-mvp/HyperLogLogLog (p = 13).csv'
+			'results/comparison-empirical-mvp/Apache Data Sketches Java CPC (p = 10).csv',
+			'results/comparison-empirical-mvp/Apache Data Sketches Java HLL4 (p = 11).csv',
+			'results/comparison-empirical-mvp/Apache Data Sketches Java HLL6 (p = 11).csv',
+			'results/comparison-empirical-mvp/Apache Data Sketches Java HLL8 (p = 11).csv',
+			'results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 0, p = 11).csv',
+			'results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 1, p = 10).csv',
+			'results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 2, p = 10).csv',
+			'results/comparison-empirical-mvp/ExaLogLog (t = 1, d = 9, p = 9).csv',
+			'results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 16, p = 8).csv',
+			'results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 20, p = 8).csv',
+			'results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 24, p = 8).csv',
+			'results/comparison-empirical-mvp/Hash4j HyperLogLog (p = 11).csv',
+			'results/comparison-empirical-mvp/Hash4j UltraLogLog (p = 10).csv',
+			'results/comparison-empirical-mvp/HyperLogLogLog (p = 11).csv',
+			'results/comparison-empirical-mvp/SpikeSketch (numOfBuckets = 128).csv'
 	standardOutput = new ByteArrayOutputStream()
 	commandLine "c++/empiricalMvpComputation"
 	dependsOn buildEmpiricalMVPComputationCpp

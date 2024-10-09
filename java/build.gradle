@@ -34,14 +34,15 @@ repositories {
 }
 
 dependencies {
-	implementation 'com.dynatrace.hash4j:hash4j:0.17.0'
-	implementation group: 'org.hipparchus', name: 'hipparchus-stat', version: '3.0'
-	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.10.2'
-	testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.25.3'
-	testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.10.2'
-	implementation 'org.apache.datasketches:datasketches-java:5.0.1'
+	implementation 'com.dynatrace.hash4j:hash4j:0.18.0'
+	implementation group: 'org.hipparchus', name: 'hipparchus-stat', version: '3.1'
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.11.1'
+	testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.26.3'
+	testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.11.1'
+	implementation group: 'org.apache.datasketches', name: 'datasketches-java', version:'6.1.0'
+	implementation group: 'org.apache.datasketches', name: 'datasketches-memory', version:'3.0.2'
 	implementation group: 'org.openjdk.jol', name: 'jol-core', version: '0.17'
-	testImplementation group: 'com.google.guava', name: 'guava', version: '33.0.0-jre'
+	testImplementation group: 'com.google.guava', name: 'guava', version: '33.3.1-jre'
 }
 
 test {
@@ -86,7 +87,7 @@ task runEmpiricalMVPComputation(type: JavaExec) {
 def pValuesErrorSimulation = [4, 6, 8, 10]
 def tValuesErrorSimulation = [1, 2, 2, 2]
 def dValuesErrorSimulation = [9, 16, 20, 24]
-def errorSimulationTasks = []
+def exaloglogErrorSimulationTasks = []
 for(int i = 0; i < Math.min(tValuesErrorSimulation.size(), dValuesErrorSimulation.size()); ++i) {
 	def t = tValuesErrorSimulation[i]
 	def d = dValuesErrorSimulation[i]
@@ -105,13 +106,41 @@ for(int i = 0; i < Math.min(tValuesErrorSimulation.size(), dValuesErrorSimulatio
 			]
 			jvmArgs = ['-Xmx16g']
 		}
-		errorSimulationTasks.add(sketchTaskName)
+		exaloglogErrorSimulationTasks.add(sketchTaskName)
 	}
+}
+task "simulateExaloglogEstimationErrors" {
+	group "Main"
+	dependsOn exaloglogErrorSimulationTasks
+}
+
+def tokenParameterValuesErrorSimulation = [6, 8, 10, 12, 18, 26]
+def tokenErrorSimulationTasks = []
+for(int i = 0; i < tokenParameterValuesErrorSimulation.size(); ++i) {
+	def tokenParameter = tokenParameterValuesErrorSimulation[i]
+	def sketchTaskName = "simulateTokenEstimationErrors" + String.format("%02d", tokenParameter)
+	def outputFileName = '../results/error/token-estimation-error' + '-' + String.format("%02d", tokenParameter) + '.csv'
+	task "${sketchTaskName}"(type: JavaExec) {
+		outputs.files outputFileName
+		classpath = sourceSets.test.runtimeClasspath
+		mainClass = 'com.dynatrace.exaloglogpaper.TokenEstimationErrorSimulation'
+		args = [
+			tokenParameter.toString(),
+			outputFileName
+		]
+		jvmArgs = ['-Xmx16g']
+		tokenErrorSimulationTasks.add(sketchTaskName)
+	}
+}
+task "simulateTokenEstimationErrors" {
+	group "Main"
+	dependsOn tokenErrorSimulationTasks
 }
 task "simulateEstimationErrors" {
 	group "Main"
-	dependsOn errorSimulationTasks
+	dependsOn simulateExaloglogEstimationErrors, simulateTokenEstimationErrors
 }
+
 
 jacoco {
 	toolVersion = '0.8.11'

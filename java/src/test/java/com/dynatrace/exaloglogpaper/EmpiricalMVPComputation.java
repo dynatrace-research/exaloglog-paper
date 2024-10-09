@@ -94,7 +94,7 @@ public class EmpiricalMVPComputation {
 
     @Override
     public double getEstimate(ExaLogLog sketch) {
-      return sketch.getDistinctCountEstimate();
+      return sketch.getDistinctCountEstimate(ExaLogLog.MAXIMUM_LIKELIHOOD_ESTIMATOR);
     }
   }
 
@@ -123,7 +123,7 @@ public class EmpiricalMVPComputation {
 
     @Override
     public String getLabel() {
-      return "Hash4j UltraLogLog";
+      return "Hash4j UltraLogLog (p = " + p + ")";
     }
 
     @Override
@@ -157,7 +157,7 @@ public class EmpiricalMVPComputation {
 
     @Override
     public String getLabel() {
-      return "Hash4j HyperLogLog";
+      return "Hash4j HyperLogLog (p = " + p + ")";
     }
 
     @Override
@@ -396,7 +396,15 @@ public class EmpiricalMVPComputation {
 
   private static <T> void test(Config<T> config) {
     int numCycles = 100000;
-    List<Statistics> statistics = Collections.singletonList(new Statistics(1_000_000));
+    List<Statistics> statistics =
+        Arrays.asList(
+            new Statistics(1),
+            new Statistics(10),
+            new Statistics(100),
+            new Statistics(1000),
+            new Statistics(10_000),
+            new Statistics(100_000),
+            new Statistics(1_000_000));
 
     SplittableRandom rng = new SplittableRandom(0);
 
@@ -464,19 +472,19 @@ public class EmpiricalMVPComputation {
 
     List<Future<?>> futures = new ArrayList<>();
 
-    futures.add(executor.submit(() -> test(new Hash4jHyperLogLogConfig(13))));
-    futures.add(executor.submit(() -> test(new Hash4jUltraLogLogConfig(12))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesCPCConfig(12))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL4Config(13))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL6Config(13))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL8Config(13))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 0, 13))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 1, 12))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 2, 12))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(1, 9, 11))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 16, 10))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 20, 10))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 24, 10))));
+    futures.add(executor.submit(() -> test(new Hash4jHyperLogLogConfig(11))));
+    futures.add(executor.submit(() -> test(new Hash4jUltraLogLogConfig(10))));
+    futures.add(executor.submit(() -> test(new ApacheDataSketchesCPCConfig(10))));
+    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL4Config(11))));
+    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL6Config(11))));
+    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL8Config(11))));
+    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 0, 11))));
+    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 1, 10))));
+    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 2, 10))));
+    futures.add(executor.submit(() -> test(new ExaLogLogConfig(1, 9, 9))));
+    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 16, 8))));
+    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 20, 8))));
+    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 24, 8))));
 
     for (var f : futures) {
       try {

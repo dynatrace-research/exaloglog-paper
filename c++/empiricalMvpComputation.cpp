@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2023-2024 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -28,8 +28,77 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include "hyperlogloglog/HyperLogLogLog.hpp"
+#include "SpikeSketch/SpikeSketch/utils/MurmurHash3.h"
+#include "SpikeSketch/SpikeSketch/spike_sketch_extend.h"
+
+using namespace std;
+
+double mutiBktQuery(vector<spike_sketch> &spikeSketchArray, double alpha0,
+		double alpha1, double beta0, double beta1, double coe);
+
+class SpikeSketchConfig {
+
+	static constexpr int n = 20; //Number of cells in a single bucket
+	static constexpr int ncode = 4; //Number of bits in a single cell
+	static constexpr int p = 12;
+
+	uint32_t numOfBuckets;
+
+	static constexpr uint32_t seed = 0x529b9601;
+
+public:
+	SpikeSketchConfig(uint32_t numOfBuckets) : numOfBuckets(numOfBuckets) {
+
+	}
+
+	vector<spike_sketch> create() const {
+		vector < spike_sketch > spikeSketchArray;
+		for (uint32_t bktIdx = 0; bktIdx < numOfBuckets; bktIdx++) {
+			spike_sketch ss = spike_sketch(n, p, ncode, seed);
+			spikeSketchArray.push_back(ss);
+		}
+		return spikeSketchArray;
+	}
+
+	void add(vector<spike_sketch> &sketch, uint64_t hash) const {
+		uint32_t tempInt32 = 0;
+		MurmurHash3_x86_32(&hash, 8, seed + 231321, &tempInt32);
+		spike_sketch ss = sketch[tempInt32 % numOfBuckets];
+		ss.update(hash);
+	}
+
+	double estimate(const vector<spike_sketch> &sketch) const {
+
+		double alpha0 = 0.1;
+		double alpha1 = 0.88;
+		double beta0 = 1.12;
+		double beta1 = 1.46;
+		double myCoe = 0.573; //Coefficient of correction
+
+		vector < spike_sketch > sketch_copy = sketch;
+
+		double estimate = mutiBktQuery(sketch_copy, alpha0, alpha1, beta0,
+				beta1, myCoe);
+		assert(estimate == estimate);
+		return estimate;
+	}
+
+	size_t getInMemorySizeInBytes(const vector<spike_sketch> &sketch) const {
+		return static_cast<size_t>(numOfBuckets) * 8;
+	}
+
+	size_t getSerializedSizeInBytes(const vector<spike_sketch> &sketch) const {
+		return static_cast<size_t>(numOfBuckets) * 8;
+	}
+
+	std::string getLabel() const {
+		return "SpikeSketch (numOfBuckets = " + std::to_string(numOfBuckets)
+				+ ")";
+	}
+};
 
 class HyperLogLogLogConfig {
 
@@ -189,6 +258,12 @@ template<typename T> void test(const T &config = T()) {
 	uint64_t num_cycles = 100000;
 
 	std::vector < uint64_t > distinct_counts;
+	distinct_counts.push_back(1);
+	distinct_counts.push_back(10);
+	distinct_counts.push_back(100);
+	distinct_counts.push_back(1000);
+	distinct_counts.push_back(10000);
+	distinct_counts.push_back(100000);
 	distinct_counts.push_back(1000000);
 	std::vector<Statistics> data;
 	for (uint64_t distinct_count : distinct_counts) {
@@ -254,8 +329,8 @@ int main() {
 #pragma omp single
 	{
 #pragma omp task
-		test(HyperLogLogLogConfig(13));
-
+		test(HyperLogLogLogConfig(11));
+		test(SpikeSketchConfig(128));
 	}
 }
 

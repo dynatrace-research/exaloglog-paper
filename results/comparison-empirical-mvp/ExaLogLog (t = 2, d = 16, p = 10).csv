@@ -1,3 +1,0 @@
-number of cycles = 100000; data structure = ExaLogLog (t = 2, d = 16, p = 10)
-true distinct count; minimum memory size; average memory size; maximum memory size; minimum serialization size; average serialization size; maximum serialization size; relative distinct count estimation bias; relative distinct count estimation rmse; estimated memory MVP; estimated serialization MVP
-1000000; 3112; 3112.0; 3112; 3072; 3072.0; 3072; -4.4603979351748285E-5; 0.01244227121847636; 3.854152575093421; 3.804613338909701

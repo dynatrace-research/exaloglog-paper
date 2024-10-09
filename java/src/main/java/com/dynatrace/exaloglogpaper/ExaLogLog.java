@@ -32,6 +32,7 @@ import static java.util.Objects.requireNonNull;
 import com.dynatrace.hash4j.distinctcount.StateChangeObserver;
 import com.dynatrace.hash4j.util.PackedArray;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** ExaLogLog sketch. */
 public class ExaLogLog {
@@ -44,6 +45,7 @@ public class ExaLogLog {
 
   private static final int MAX_T = 58; // 64 - 6
   private static final int MIN_P = 2;
+  private static final int TOKEN_PARAMETER = 26;
 
   private final byte p;
   private final byte t;
@@ -274,7 +276,7 @@ public class ExaLogLog {
    * @return the 32-bit token
    */
   public static int computeToken(long hashValue) {
-    return DistinctCountUtil.computeToken(hashValue);
+    return DistinctCountUtil.computeToken(hashValue, TOKEN_PARAMETER);
   }
 
   /**
@@ -286,7 +288,7 @@ public class ExaLogLog {
    * @return this sketch
    */
   public ExaLogLog addToken(int token) {
-    return add(DistinctCountUtil.reconstructHash(token));
+    return add(DistinctCountUtil.reconstructHash(token, TOKEN_PARAMETER));
   }
 
   /**
@@ -532,7 +534,7 @@ public class ExaLogLog {
    * @return this sketch
    */
   public ExaLogLog addToken(int token, StateChangeObserver stateChangeObserver) {
-    return add(DistinctCountUtil.reconstructHash(token), stateChangeObserver);
+    return add(DistinctCountUtil.reconstructHash(token, TOKEN_PARAMETER), stateChangeObserver);
   }
 
   /**
@@ -598,10 +600,14 @@ public class ExaLogLog {
     }
   }
 
-  private static final class MaximumLikelihoodEstimator implements Estimator {
+  static final class MaximumLikelihoodEstimator implements Estimator {
 
     @Override
     public double estimate(ExaLogLog sketch) {
+      return estimate(sketch, null);
+    }
+
+    double estimate(ExaLogLog sketch, AtomicLong iterationCounter) {
       int p = sketch.p;
       int t = sketch.t;
       int d = sketch.d;
@@ -620,7 +626,7 @@ public class ExaLogLog {
       double a = unsignedLongToDouble(agg) * 0x1p-64 * factor;
 
       return factor
-          * DistinctCountUtil.solveMaximumLikelihoodEquation(a, b, 63 - p - t, 1e-3 / Math.sqrt(m))
+          * DistinctCountUtil.solveMaximumLikelihoodEquation(a, b, 63 - p - t, 0., iterationCounter)
           / (1 + ML_BIAS_CORRECTION_CONSTANTS[t][d] / m);
     }
   }

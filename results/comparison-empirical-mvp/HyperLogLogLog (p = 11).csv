@@ -1,0 +1,9 @@
+number of cycles = 100000; data structure = HyperLogLogLog (p = 11)
+true distinct count; minimum memory size; average memory size; maximum memory size; minimum serialization size; average serialization size; maximum serialization size; relative distinct count estimation bias; relative distinct count estimation rmse; estimated memory MVP; estimated serialization MVP
+1; 928; 928.061; 936; 768; 768.023; 771; 0.00024422; 0.00024422; 0.000442822; 0.00036646
+10; 928; 928.607; 936; 768; 768.233; 775; 0.000325538; 0.0145531; 1.57338; 1.30166
+100; 928; 932.416; 944; 768; 770.106; 783; 0.000261186; 0.0157074; 1.84038; 1.52002
+1000; 928; 948.608; 976; 768; 784.989; 815; 0.000276176; 0.0170149; 2.19703; 1.81808
+10000; 1024; 1080.21; 1168; 824; 883.629; 949; 0.000212083; 0.0206016; 3.66776; 3.00028
+100000; 1048; 1094.15; 1168; 822; 880.632; 953; 5.11701e-05; 0.0227191; 4.51801; 3.63635
+1000000; 1056; 1099.95; 1168; 834; 898.095; 968; -3.04883e-05; 0.0230032; 4.65629; 3.80179

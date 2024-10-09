@@ -1,0 +1,9 @@
+number of cycles = 100000; data structure = SpikeSketch (numOfBuckets = 128)
+true distinct count; minimum memory size; average memory size; maximum memory size; minimum serialization size; average serialization size; maximum serialization size; relative distinct count estimation bias; relative distinct count estimation rmse; estimated memory MVP; estimated serialization MVP
+1; 1024; 1024; 1024; 1024; 1024; 1024; -0.00124482; 0.934734; 7157.57; 7157.57
+10; 1024; 1024; 1024; 1024; 1024; 1024; 0.00152622; 0.296519; 720.267; 720.267
+100; 1024; 1024; 1024; 1024; 1024; 1024; 0.00101015; 0.0947324; 73.5169; 73.5169
+1000; 1024; 1024; 1024; 1024; 1024; 1024; -0.00180084; 0.0332924; 9.07987; 9.07987
+10000; 1024; 1024; 1024; 1024; 1024; 1024; 0.0249849; 0.0395904; 12.8402; 12.8402
+100000; 1024; 1024; 1024; 1024; 1024; 1024; 0.00056696; 0.0219721; 3.95489; 3.95489
+1000000; 1024; 1024; 1024; 1024; 1024; 1024; 0.00326507; 0.0225741; 4.17454; 4.17454
