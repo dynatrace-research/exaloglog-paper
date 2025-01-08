@@ -1,0 +1,40 @@
+dataSize=16; numRepetitions=1000
+data structure; distinct count; insertion time (ns)
+SpikeSketch (128 buckets); 1; 35727
+SpikeSketch (128 buckets); 2; 17686.5
+SpikeSketch (128 buckets); 5; 7130.08
+SpikeSketch (128 buckets); 10; 3632.12
+SpikeSketch (128 buckets); 20; 1855.24
+SpikeSketch (128 buckets); 50; 798.129
+SpikeSketch (128 buckets); 100; 442.119
+SpikeSketch (128 buckets); 200; 265.611
+SpikeSketch (128 buckets); 500; 158.693
+SpikeSketch (128 buckets); 1000; 125.26
+SpikeSketch (128 buckets); 2000; 113.137
+SpikeSketch (128 buckets); 5000; 106.025
+SpikeSketch (128 buckets); 10000; 101.575
+SpikeSketch (128 buckets); 20000; 95.5529
+SpikeSketch (128 buckets); 50000; 89.3961
+SpikeSketch (128 buckets); 100000; 84.9258
+SpikeSketch (128 buckets); 200000; 81.0768
+SpikeSketch (128 buckets); 500000; 78.2073
+SpikeSketch (128 buckets); 1000000; 77.4506
+HyperLogLogLog (p=11); 1; 85.81
+HyperLogLogLog (p=11); 2; 55.2405
+HyperLogLogLog (p=11); 5; 40.026
+HyperLogLogLog (p=11); 10; 35.2686
+HyperLogLogLog (p=11); 20; 33.1799
+HyperLogLogLog (p=11); 50; 31.7964
+HyperLogLogLog (p=11); 100; 119.449
+HyperLogLogLog (p=11); 200; 123.553
+HyperLogLogLog (p=11); 500; 71.8197
+HyperLogLogLog (p=11); 1000; 128.918
+HyperLogLogLog (p=11); 2000; 214.735
+HyperLogLogLog (p=11); 5000; 221.874
+HyperLogLogLog (p=11); 10000; 202.752
+HyperLogLogLog (p=11); 20000; 156.853
+HyperLogLogLog (p=11); 50000; 104.631
+HyperLogLogLog (p=11); 100000; 74.7252
+HyperLogLogLog (p=11); 200000; 55.3601
+HyperLogLogLog (p=11); 500000; 37.4611
+HyperLogLogLog (p=11); 1000000; 30.0952

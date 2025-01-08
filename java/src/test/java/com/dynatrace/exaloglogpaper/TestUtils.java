@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
 
 public final class TestUtils {
 
@@ -80,33 +81,6 @@ public final class TestUtils {
     double getProbability();
 
     long generateHashValue(int registerIndex);
-  }
-
-  // used for HyperLogLog and UltraLogLog
-  public static List<HashGenerator> getHashGenerators1(int p) {
-    List<HashGenerator> generators = new ArrayList<>();
-
-    for (int updateValue = 1; updateValue <= 65 - p; ++updateValue) {
-
-      final double probability =
-          Double.longBitsToDouble((0x3ffL - Math.min(updateValue, 64 - p)) << 52);
-      int nlz = updateValue - 1;
-      final long z = (nlz < 64) ? 0xFFFFFFFFFFFFFFFFL >>> p >>> nlz : 0L;
-
-      generators.add(
-          new HashGenerator() {
-            @Override
-            public double getProbability() {
-              return probability;
-            }
-
-            @Override
-            public long generateHashValue(int registerIndex) {
-              return z | (((long) registerIndex) << -p);
-            }
-          });
-    }
-    return generators;
   }
 
   public static List<HashGenerator> getHashGenerators(int p, int t) {
@@ -190,5 +164,96 @@ public final class TestUtils {
                 .average()
                 .getAsDouble())
         / trueValue;
+  }
+
+  static boolean generateBernoulli(double probability, PseudoRandomGenerator prg) {
+    if (probability == 1) return true;
+    if (probability == 0) return false;
+    while (true) {
+      probability *= 0x1p63;
+      long probabilityLow = (long) Math.floor(probability);
+      long probabilityHigh = (long) Math.ceil(probability);
+      long random = prg.nextLong() & 0x7FFFFFFFFFFFFFFFL;
+      if (random < probabilityLow) return true;
+      if (random >= probabilityHigh) return false;
+      probability -= probabilityLow;
+    }
+  }
+
+  private static final double POISSON_GENERATION_THRESHOLD = 0.05; // should be smaller than 1
+
+  static ExaLogLog generateExaLogLog(
+      double distinctCount, int t, int d, int p, PseudoRandomGenerator prg) {
+    long distinctCountLong = (long) distinctCount;
+    double relativeErrorForPoisson = 1. / Math.sqrt(distinctCount);
+    if (distinctCountLong != distinctCount
+        || relativeErrorForPoisson
+            < POISSON_GENERATION_THRESHOLD
+                * PrecomputedConstants.getTheoreticalRelativeErrorML(t, d, p)) {
+      return generateExaLogLogPoisson(distinctCount, t, d, p, prg);
+    } else {
+      return generateExaLogLogExact(distinctCountLong, t, d, p, prg);
+    }
+  }
+
+  private static ExaLogLog generateExaLogLogExact(
+      long distinctCount, int t, int d, int p, PseudoRandomGenerator prg) {
+    checkArgument(distinctCount >= 0);
+    ExaLogLog sketch = ExaLogLog.create(t, d, p);
+    for (long i = 0; i < distinctCount; ++i) {
+      sketch.add(prg.nextLong());
+    }
+    return sketch;
+  }
+
+  static final double[] POW_0_5 =
+      IntStream.range(0, 65).mapToDouble(i -> Math.pow(0.5, i)).toArray();
+
+  static int phi(long k, int p, int t) {
+    return (int) Math.min((t + 1 + ((k - 1) >>> t)), 64 - p);
+  }
+
+  private static final long generateHashValue(int updateValue, int registerIndex, int p, int t) {
+    int sub = (updateValue - 1) & ((1 << t) - 1);
+    int nlz = (updateValue - 1) >>> t;
+
+    final long z = (0xFFFFFFFFFFFFFFFFL >>> nlz >>> (t + p) << (t + p)) | sub;
+
+    return z | (registerIndex << t);
+  }
+
+  private static ExaLogLog generateExaLogLogPoisson(
+      double distinctCount, int t, int d, int p, PseudoRandomGenerator prg) {
+    checkArgument(distinctCount >= 0);
+    ExaLogLog sketch = ExaLogLog.create(t, d, p);
+    int m = 1 << p;
+    int maxUpdateValue = (65 - p - t) << t;
+
+    double[] probabilities = new double[64 - t - p];
+    for (int ph = t + 1; ph <= 64 - p; ph += 1) {
+      probabilities[ph - t - 1] = -Math.expm1(-distinctCount / m * POW_0_5[ph]);
+    }
+
+    for (int i = 0; i < m; ++i) {
+      int max = 0;
+      for (int k = maxUpdateValue; k >= 1 && k >= max - d; --k) {
+        if (generateBernoulli(probabilities[phi(k, p, t) - t - 1], prg)) {
+          sketch.add(generateHashValue(k, i, p, t));
+          if (max == 0) max = k;
+        }
+      }
+    }
+    return sketch;
+  }
+
+  public static double hurvitzZeta(double x, double y) {
+    double sum = 0;
+    int u = 0;
+    while (true) {
+      double oldSum = sum;
+      sum += Math.pow(u + y, -x);
+      if (!(oldSum < sum)) return sum;
+      u += 1;
+    }
   }
 }

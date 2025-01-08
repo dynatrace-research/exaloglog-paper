@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -151,5 +151,63 @@ class GeneralExaLogLogTest {
     ExaLogLog ell1 = ExaLogLog.create(2, 2, 2);
     ExaLogLog ell2 = ExaLogLog.create(3, 2, 2);
     assertThatIllegalArgumentException().isThrownBy(() -> ExaLogLog.merge(ell1, ell2));
+  }
+
+  private static int phi(long k, int p, int t) {
+    return (int) Math.min((t + 1 + ((k - 1) >>> t)), 64 - p);
+  }
+
+  // corresponds to omega * 2^(64 - p)
+  private static long omegaScaled(long u, int p, int t) {
+    int phiEval = phi(u, p, t);
+    return (((1L - t + phiEval) << t) - u) << (-p - phiEval);
+  }
+
+  private static long contributeReference(long r, int[] b, int p, int t, int d) {
+    long u = r >>> d;
+    if (u == 0) return (1L << -p);
+    long a = omegaScaled(u, p, t);
+    for (long k = Math.max(1, u - d); k <= u; ++k) {
+      boolean unset = (u != k) && ((r & (1L << (d - u + k))) == 0);
+      if (unset) {
+        a += 1L << (-p - phi(k, p, t));
+      } else if (b != null) {
+        b[phi(k, p, t) - t - 1] += 1;
+      }
+    }
+    return a;
+  }
+
+  private static void verifyContribute(long r, int t, int p, int d) {
+    int[] b = new int[64];
+    int[] bRef = new int[64];
+    long a = ExaLogLog.contribute(r, b, t, d, p);
+    long a2 = ExaLogLog.contribute(r, null, t, d, p);
+    long aRef = contributeReference(r, bRef, p, t, d);
+    assertThat(a).isEqualTo(aRef);
+    assertThat(a2).isEqualTo(aRef);
+    assertThat(b).containsExactly(bRef);
+  }
+
+  private static void verifyContribute(int t, int p, int d) {
+    int numCycles = 1;
+    SplittableRandom random = new SplittableRandom(0);
+    for (long u = 0; u <= ((65L - p - t) << t); ++u) {
+      for (int i = 0; i < numCycles; ++i) {
+        long r = (u << d) | (random.nextLong() >>> 1 >>> ~d);
+        verifyContribute(r, t, p, d);
+      }
+    }
+  }
+
+  @Test
+  void testContribute() {
+    for (int t = 0; t <= 8; ++t) {
+      for (int d = 0; d <= ExaLogLog.getMaxD(t); ++d) {
+        for (int p = ExaLogLog.getMinP(); p <= 8; ++p) {
+          verifyContribute(t, p, d);
+        }
+      }
+    }
   }
 }

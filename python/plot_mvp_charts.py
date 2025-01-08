@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+# Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 #
 # This software and associated documentation files (the "Software")
 # are being made available by Dynatrace LLC for the sole purpose of
@@ -57,7 +57,7 @@ def plot_improvement(ax, ull, hll, d_pos, y_pos):
     )
     improvement = round(100 * (ull.mvp / hll.mvp - 1))
     txt = ax.text(
-        d_pos + 0.5,
+        d_pos - 5.5,
         ull.mvp + y_pos * (hll.mvp - ull.mvp),
         "$" + str(improvement) + r"\%$",
         zorder=1.6,
@@ -68,7 +68,7 @@ def plot_improvement(ax, ull, hll, d_pos, y_pos):
         xy=(d_pos, ull.mvp),
         xytext=(d_pos, hll.mvp),
         arrowprops=dict(arrowstyle="->", linewidth=help_linewidth, shrinkB=0.5),
-        zorder=1.7,
+        zorder=4,
     )
 
 
@@ -96,12 +96,12 @@ def make_chart(
     d_values = range(d_max + 1)
 
     fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
-    fig.set_size_inches(5, 3.2)
+    fig.set_size_inches(5, 2.5)
 
     if mark_improvement:
         hll_mvp = mvp_func(q=6, b=2, d=0)
         opt_mvp = mvp_func(q=8, b=pow(2, 0.25), d=None)
-        plot_improvement(ax, opt_mvp, hll_mvp, 54, 0.35)
+        plot_improvement(ax, opt_mvp, hll_mvp, 57.5, 0.37)
 
     plotted_lines = []
     for t in reversed(t_values):
@@ -123,7 +123,7 @@ def make_chart(
                 xy=(opt_mvp.d, opt_mvp.mvp),
                 xytext=(
                     opt_mvp.d,
-                    opt_mvp.mvp - delta_y * 0.08,
+                    opt_mvp.mvp - delta_y * 0.085,
                 ),
                 arrowprops=dict(arrowstyle="->", color=colors[t], linewidth=1.5),
             )
@@ -131,7 +131,7 @@ def make_chart(
     ax.set_ylim(y_limits)
     ax.set_xlim([-5, 60])
     ax.set_xlabel(r"$\symNumExtraBits$")
-    ax.set_ylabel(r"memory-variance product")
+    ax.set_ylabel(r"memory-variance product (MVP)")
     # ax.set_xticks(numpy.arange(0, 65, 5.0))
     ax.grid(visible=True)
 
@@ -168,7 +168,7 @@ def make_chart(
     for pos, line in zip(label_pos, reversed(plotted_lines)):
         labelLine(line, pos, bbox=None, outline_width=6)
 
-    fig.subplots_adjust(top=0.98, bottom=0.12, left=0.105, right=0.91, hspace=0.08)
+    fig.subplots_adjust(top=0.98, bottom=0.16, left=0.105, right=0.91, hspace=0.08)
 
     fig.savefig(
         file_name,
@@ -185,13 +185,13 @@ make_chart(
     "paper/mvp_ml.pdf",
     True,
     labels=[
-        ("HLL", 0, 0, -2.88, -0.06),
-        ("EHLL", 0, 1, -3.2, 0.06),
-        ("ULL", 0, 2, -4.5, 0),
-        ("ELL(1,9)", 1, 9, 3.5, -0.08),
-        ("ELL(2,16)", 2, 16, 2.1, 0.09),
-        ("ELL(2,20)", 2, 20, 4.5, 0.18),
-        ("ELL(2,24)", 2, 24, 1.5, -0.085),
+        ("HLL", 0, 0, -2.88, -0.1),
+        ("EHLL", 0, 1, -3.2, -0.1),
+        ("ULL", 0, 2, -4.8, -0.02),
+        ("ELL(1,9)", 1, 9, 3.5, -0.1),
+        ("ELL(2,16)", 2, 16, 2.3, 0.1),
+        ("ELL(2,20)", 2, 20, 5, 0.21),
+        ("ELL(2,24)", 2, 24, 8, 0.03),
     ],
     mark_improvement=True,
     label_pos=[8.7, 19, 49, 24],
@@ -202,12 +202,12 @@ make_chart(
     "paper/mvp_compressed_ml.pdf",
     False,
     labels=[
-        ("HLL", 0, 0, -2.9, -0.065),
-        ("EHLL", 0, 1, -3.2, -0.06),
+        ("HLL", 0, 0, -2.9, -0.1),
+        ("EHLL", 0, 1, -3.2, -0.09),
         ("ULL", 0, 2, -4, -0.05),
         ("ELL(1,9)", 1, 9, 6, 0.03),
         ("ELL(2,16)", 2, 16, 7, 0.03),
-        ("ELL(2,20)", 2, 20, 7, 0.03),
+        ("ELL(2,20)", 2, 20, 5.7, 0.08),
         ("ELL(2,24)", 2, 24, 7, 0.03),
     ],
     label_pos=[0.6, 3, 10.5, 29],
@@ -218,16 +218,16 @@ make_chart(
     "paper/mvp_martingale.pdf",
     True,
     labels=[
-        ("HLL", 0, 0, -2.88, 0.055),
-        ("EHLL", 0, 1, -3.2, 0.06),
-        ("ULL", 0, 2, -4.5, 0),
-        ("ELL(1,9)", 1, 9, 6, 0.03),
+        ("HLL", 0, 0, -2.88, -0.13),
+        ("EHLL", 0, 1, -3.2, 0.09),
+        ("ULL", 0, 2, -4.6, -0.09),
+        ("ELL(1,9)", 1, 9, 6.3, 0.03),
         ("ELL(2,16)", 2, 16, 0, 0.1),
-        ("ELL(2,20)", 2, 20, 3, -0.08),
-        ("ELL(2,24)", 2, 24, 3, -0.07),
+        ("ELL(2,20)", 2, 20, 4.5, -0.1),
+        ("ELL(2,24)", 2, 24, 5, -0.08),
     ],
     mark_improvement=True,
-    label_pos=[5.8, 15, 40, 22],
+    label_pos=[5.7, 15, 39, 22],
 )
 make_chart(
     lambda q, d, b: mvp.mvp_martingale_compressed(d=d, b=b),
@@ -235,13 +235,13 @@ make_chart(
     "paper/mvp_compressed_martingale.pdf",
     False,
     labels=[
-        ("HLL", 0, 0, -2.9, -0.06),
-        ("EHLL", 0, 1, -3.2, -0.07),
-        ("ULL", 0, 2, -4, -0.05),
-        ("ELL(1,9)", 1, 9, 6, 0.03),
-        ("ELL(2,16)", 2, 16, 7, 0.03),
-        ("ELL(2,20)", 2, 20, 7, 0.03),
-        ("ELL(2,24)", 2, 24, 7, 0.03),
+        ("HLL", 0, 0, -2.9, -0.09),
+        ("EHLL", 0, 1, -3.2, -0.09),
+        ("ULL", 0, 2, -4.6, -0.05),
+        ("ELL(1,9)", 1, 9, 6, 0.02),
+        ("ELL(2,16)", 2, 16, 7, 0.04),
+        ("ELL(2,20)", 2, 20, 5.6, 0.08),
+        ("ELL(2,24)", 2, 24, 7, 0.05),
     ],
-    label_pos=[0.6, 2.8, 10, 27.5],
+    label_pos=[0.6, 2.8, 10, 28],
 )

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -26,6 +26,7 @@
 //
 package com.dynatrace.exaloglogpaper;
 
+import com.dynatrace.exaloglogpaper.DistinctCountUtil.SolverStatistics;
 import com.dynatrace.hash4j.random.PseudoRandomGenerator;
 import com.dynatrace.hash4j.random.PseudoRandomGeneratorProvider;
 import java.io.FileWriter;
@@ -35,7 +36,6 @@ import java.util.List;
 import java.util.SplittableRandom;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -72,9 +72,6 @@ public class ExaLogLogEstimationErrorSimulation {
     }
   }
 
-  private static final ExaLogLog.MaximumLikelihoodEstimator MAXIMUM_LIKELIHOOD_ESTIMATOR =
-      new ExaLogLog.MaximumLikelihoodEstimator();
-
   public static void doSimulation(
       int t,
       int d,
@@ -85,7 +82,7 @@ public class ExaLogLogEstimationErrorSimulation {
 
     // parameters
     int numCycles = 100_000;
-    int maxParallelism = 16;
+    int maxParallelism = 96;
     final BigInt largeScaleSimulationModeDistinctCountLimit = BigInt.fromLong(1000000);
     List<BigInt> targetDistinctCounts = TestUtils.getDistinctCountValues(1e21, 0.05);
 
@@ -153,10 +150,11 @@ public class ExaLogLogEstimationErrorSimulation {
                                 trueDistinctCount.set(targetDistinctCount);
                               }
 
-                              AtomicLong iterationCounter = new AtomicLong();
+                              SolverStatistics solverStatistics = new SolverStatistics();
                               estimatedDistinctCountsML[distinctCountIndex][i] =
-                                  MAXIMUM_LIKELIHOOD_ESTIMATOR.estimate(sketch, iterationCounter);
-                              numIterations[distinctCountIndex][i] = iterationCounter.get();
+                                  sketch.getDistinctCountEstimate(solverStatistics);
+                              numIterations[distinctCountIndex][i] =
+                                  solverStatistics.iterationCounter;
                               estimatedDistinctCountsMartingale[distinctCountIndex][i] =
                                   martingaleEstimator.getDistinctCountEstimate();
                             }

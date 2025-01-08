@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -128,10 +128,37 @@ task makeTokenErrorCharts (type: Exec) {
 }
 figFiles +=tokenErrorFigFiles
 
+def memoryOverErrorFigFiles = [
+	"paper/memory_over_error.pdf"
+]
+task makeMemoryOverErrorChart (type: Exec) {
+	inputs.files "python/preamble.py", "python/plot_memory_over_error.py","paper/symbols.tex"
+	outputs.files memoryOverErrorFigFiles
+	commandLine 'python', "python/plot_memory_over_error.py"
+}
+figFiles +=memoryOverErrorFigFiles
+
+def benchmarksFigFiles = ["paper/benchmarks.pdf"]
+task makeBenchmarkCharts (type: Exec) {
+	inputs.files "python/preamble.py", "python/benchmark_chart.py","paper/symbols.tex", "results/benchmarks/benchmark-results-estimation-cpp.csv", "results/benchmarks/benchmark-results-insertion-cpp.csv", "results/benchmarks/benchmark-results-java.json", "results/benchmarks/benchmark-results-merge-and-estimation-cpp.csv", "results/benchmarks/benchmark-results-merge-cpp.csv"
+	outputs.files benchmarksFigFiles
+	commandLine 'python', "python/benchmark_chart.py"
+}
+figFiles +=benchmarksFigFiles
+
+def memoryFigFiles = ["paper/memory.pdf"]
+task makeMemoryChart (type: Exec) {
+	inputs.files "python/preamble.py", "python/memory_chart.py","paper/symbols.tex"
+	inputs.dir "results/comparison-empirical-mvp"
+	outputs.files benchmarksFigFiles
+	commandLine 'python', "python/memory_chart.py"
+}
+figFiles +=memoryFigFiles
+
 
 task pdfFigures {
 	group 'Main'
-	dependsOn makeMvpCharts, makeExaloglogErrorCharts, makeProbabilityDensityFigure, makeTokenErrorCharts
+	dependsOn makeMvpCharts, makeExaloglogErrorCharts, makeProbabilityDensityFigure, makeTokenErrorCharts, makeMemoryOverErrorChart, makeBenchmarkCharts,makeMemoryChart
 }
 
 task calculateConstants {
@@ -179,7 +206,7 @@ spotless {
 	def googleJavaFormatVersion = '1.19.2'
 	def eclipseCdtVersion = '11.1'
 	def blackVersion = '24.4.2'
-	def greclipseVersion = '4.29'
+	def greclipseVersion = '4.32'
 	ratchetFrom 'origin/main'
 	apply plugin: 'groovy'
 	groovyGradle {
@@ -193,7 +220,7 @@ spotless {
 		licenseHeader readPythonLicense('license'), '(import|from)'
 	}
 	cpp {
-		target 'c++/empiricalMvpComputation.cpp'
+		target 'c++/empiricalMvpComputation.cpp','c++/estimationPerformance.cpp','c++/insertionPerformance.cpp','c++/SpikeSketchConfig.hpp','c++/HyperLogLogLogConfig.hpp'
 		eclipseCdt(eclipseCdtVersion)
 		licenseHeader readJavaLicense('license')
 	}
@@ -210,42 +237,12 @@ repositories {
 	mavenCentral()
 }
 
-task buildEmpiricalMVPComputationCpp (type: Exec) {
-	workingDir 'c++'
-	outputs.files "c++/empiricalMvpComputation"
-	commandLine "g++", "-std=c++20", "-fopenmp", "-Wall", "-O3", "-Wl,--allow-multiple-definition", "empiricalMvpComputation.cpp", "SpikeSketch/SpikeSketch/main_extend.cpp", "SpikeSketch/SpikeSketch/utils/MurmurHash3.cpp", "SpikeSketch/SpikeSketch/impl/ss_query1.cpp", "-o", "empiricalMvpComputation"
-	standardOutput = new ByteArrayOutputStream()
-	outputs.upToDateWhen { false }
-}
-
-task runEmpiricalMVPComputationCpp (type: Exec) {
-	inputs.files "c++/empiricalMvpComputation"
-	outputs.files \
-			'results/comparison-empirical-mvp/Apache Data Sketches Java CPC (p = 10).csv',
-			'results/comparison-empirical-mvp/Apache Data Sketches Java HLL4 (p = 11).csv',
-			'results/comparison-empirical-mvp/Apache Data Sketches Java HLL6 (p = 11).csv',
-			'results/comparison-empirical-mvp/Apache Data Sketches Java HLL8 (p = 11).csv',
-			'results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 0, p = 11).csv',
-			'results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 1, p = 10).csv',
-			'results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 2, p = 10).csv',
-			'results/comparison-empirical-mvp/ExaLogLog (t = 1, d = 9, p = 9).csv',
-			'results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 16, p = 8).csv',
-			'results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 20, p = 8).csv',
-			'results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 24, p = 8).csv',
-			'results/comparison-empirical-mvp/Hash4j HyperLogLog (p = 11).csv',
-			'results/comparison-empirical-mvp/Hash4j UltraLogLog (p = 10).csv',
-			'results/comparison-empirical-mvp/HyperLogLogLog (p = 11).csv',
-			'results/comparison-empirical-mvp/SpikeSketch (numOfBuckets = 128).csv'
-	standardOutput = new ByteArrayOutputStream()
-	commandLine "c++/empiricalMvpComputation"
-	dependsOn buildEmpiricalMVPComputationCpp
-}
-
-task runEmpiricalMVPComputationJava {
-	dependsOn ':java:runEmpiricalMVPComputation'
-}
-
 task runEmpiricalMVPComputation {
 	group 'Main'
-	dependsOn runEmpiricalMVPComputationCpp, runEmpiricalMVPComputationJava
+	dependsOn ':java:runEmpiricalMVPComputation', ':c++:runEmpiricalMVPComputation'
+}
+
+task runBenchmarks {
+	group 'main'
+	dependsOn ':java:runBenchmarks', ':c++:runBenchmarks'
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2023-2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2023-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -30,127 +30,19 @@
 #include <vector>
 #include <algorithm>
 
-#include "hyperlogloglog/HyperLogLogLog.hpp"
-#include "SpikeSketch/SpikeSketch/utils/MurmurHash3.h"
-#include "SpikeSketch/SpikeSketch/spike_sketch_extend.h"
+#include "SpikeSketchConfig.hpp"
+#include "HyperLogLogLogConfig.hpp"
 
 using namespace std;
 
-double mutiBktQuery(vector<spike_sketch> &spikeSketchArray, double alpha0,
-		double alpha1, double beta0, double beta1, double coe);
-
-class SpikeSketchConfig {
-
-	static constexpr int n = 20; //Number of cells in a single bucket
-	static constexpr int ncode = 4; //Number of bits in a single cell
-	static constexpr int p = 12;
-
-	uint32_t numOfBuckets;
-
-	static constexpr uint32_t seed = 0x529b9601;
-
-public:
-	SpikeSketchConfig(uint32_t numOfBuckets) : numOfBuckets(numOfBuckets) {
-
-	}
-
-	vector<spike_sketch> create() const {
-		vector < spike_sketch > spikeSketchArray;
-		for (uint32_t bktIdx = 0; bktIdx < numOfBuckets; bktIdx++) {
-			spike_sketch ss = spike_sketch(n, p, ncode, seed);
-			spikeSketchArray.push_back(ss);
-		}
-		return spikeSketchArray;
-	}
-
-	void add(vector<spike_sketch> &sketch, uint64_t hash) const {
-		uint32_t tempInt32 = 0;
-		MurmurHash3_x86_32(&hash, 8, seed + 231321, &tempInt32);
-		spike_sketch ss = sketch[tempInt32 % numOfBuckets];
-		ss.update(hash);
-	}
-
-	double estimate(const vector<spike_sketch> &sketch) const {
-
-		double alpha0 = 0.1;
-		double alpha1 = 0.88;
-		double beta0 = 1.12;
-		double beta1 = 1.46;
-		double myCoe = 0.573; //Coefficient of correction
-
-		vector < spike_sketch > sketch_copy = sketch;
-
-		double estimate = mutiBktQuery(sketch_copy, alpha0, alpha1, beta0,
-				beta1, myCoe);
-		assert(estimate == estimate);
-		return estimate;
-	}
-
-	size_t getInMemorySizeInBytes(const vector<spike_sketch> &sketch) const {
-		return static_cast<size_t>(numOfBuckets) * 8;
-	}
-
-	size_t getSerializedSizeInBytes(const vector<spike_sketch> &sketch) const {
-		return static_cast<size_t>(numOfBuckets) * 8;
-	}
-
-	std::string getLabel() const {
-		return "SpikeSketch (numOfBuckets = " + std::to_string(numOfBuckets)
-				+ ")";
-	}
-};
-
-class HyperLogLogLogConfig {
-
-	uint8_t p;
-
-public:
-	HyperLogLogLogConfig(uint8_t p) : p(p) {
-	}
-
-	hyperlogloglog::HyperLogLogLog<uint64_t> create() const {
-		return hyperlogloglog::HyperLogLogLog < uint64_t
-				> (1 << p, 3, hyperlogloglog::HyperLogLogLog < uint64_t
-						> ::HYPERLOGLOGLOG_COMPRESS_WHEN_APPEND
-						| hyperlogloglog::HyperLogLogLog < uint64_t
-								> ::HYPERLOGLOGLOG_COMPRESS_TYPE_INCREASE);
-	}
-
-	void add(hyperlogloglog::HyperLogLogLog<uint64_t> &sketch,
-			uint64_t hash) const {
-		sketch.add(hash);
-	}
-
-	double estimate(
-			const hyperlogloglog::HyperLogLogLog<uint64_t> &sketch) const {
-		double estimate = sketch.estimate();
-		assert(estimate == estimate);
-		return estimate;
-	}
-
-	size_t getInMemorySizeInBytes(
-			const hyperlogloglog::HyperLogLogLog<uint64_t> &sketch) const {
-		return sketch.in_memory_size_in_bytes();
-	}
-
-	size_t getSerializedSizeInBytes(
-			const hyperlogloglog::HyperLogLogLog<uint64_t> &sketch) const {
-		return (sketch.bitSize() + 7) / 8;
-	}
-
-	std::string getLabel() const {
-		return "HyperLogLogLog (p = " + std::to_string(p) + ")";
-	}
-};
-
-std::vector<uint64_t> getDistinctCounts(uint64_t max, double relativeStep) {
-	std::vector < uint64_t > result;
+vector<uint64_t> getDistinctCounts(uint64_t max, double relativeStep) {
+	vector < uint64_t > result;
 	while (max > 0) {
 		result.push_back(max);
-		max = std::min(max - 1,
-				static_cast<uint64_t>(std::ceil(max / (1 + relativeStep))));
+		max = min(max - 1,
+				static_cast<uint64_t>(ceil(max / (1 + relativeStep))));
 	}
-	std::reverse(result.begin(), result.end());
+	reverse(result.begin(), result.end());
 	return result;
 }
 
@@ -159,14 +51,14 @@ class Statistics {
 private:
 	const uint64_t trueDistinctCount;
 	uint64_t sumInMemorySizeInBytes = 0;
-	uint64_t minimumInMemorySizeInBytes = std::numeric_limits < uint64_t
-			> ::max();
-	uint64_t maximumInMemorySizeInBytes = std::numeric_limits < uint64_t
-			> ::min();
+	uint64_t sumInMemorySizeInBytesSquared = 0;
+	uint64_t minimumInMemorySizeInBytes = numeric_limits < uint64_t > ::max();
+	uint64_t maximumInMemorySizeInBytes = numeric_limits < uint64_t > ::min();
 	uint64_t sumSerializationSizeInBytes = 0;
-	uint64_t minimumSerializationSizeInBytes = std::numeric_limits < uint64_t
+	uint64_t sumSerializationSizeInBytesSquared = 0;
+	uint64_t minimumSerializationSizeInBytes = numeric_limits < uint64_t
 			> ::max();
-	uint64_t maximumSerializationSizeInBytes = std::numeric_limits < uint64_t
+	uint64_t maximumSerializationSizeInBytes = numeric_limits < uint64_t
 			> ::min();
 	uint64_t count = 0;
 
@@ -181,22 +73,29 @@ public:
 
 	void add(uint64_t inMemorySizeInBytes, uint64_t serializedSizeInBytes,
 			double distinctCountEstimate) {
-		count += 1;
-		minimumInMemorySizeInBytes = std::min(minimumInMemorySizeInBytes,
-				inMemorySizeInBytes);
-		maximumInMemorySizeInBytes = std::max(maximumInMemorySizeInBytes,
-				inMemorySizeInBytes);
-		sumInMemorySizeInBytes += inMemorySizeInBytes;
-		minimumSerializationSizeInBytes = std::min(
-				minimumSerializationSizeInBytes, serializedSizeInBytes);
-		maximumSerializationSizeInBytes = std::max(
-				maximumSerializationSizeInBytes, serializedSizeInBytes);
-		sumSerializationSizeInBytes += serializedSizeInBytes;
-		double distinctCountEstimationError = distinctCountEstimate
-				- trueDistinctCount;
-		sumDistinctCountEstimationError += distinctCountEstimationError;
-		sumDistinctCountEstimationErrorSquared += distinctCountEstimationError
-				* distinctCountEstimationError;
+#pragma omp critical 
+		{
+			count += 1;
+			minimumInMemorySizeInBytes = std::min(minimumInMemorySizeInBytes,
+					inMemorySizeInBytes);
+			maximumInMemorySizeInBytes = std::max(maximumInMemorySizeInBytes,
+					inMemorySizeInBytes);
+			sumInMemorySizeInBytes += inMemorySizeInBytes;
+			sumInMemorySizeInBytesSquared += inMemorySizeInBytes
+					* inMemorySizeInBytes;
+			minimumSerializationSizeInBytes = std::min(
+					minimumSerializationSizeInBytes, serializedSizeInBytes);
+			maximumSerializationSizeInBytes = std::max(
+					maximumSerializationSizeInBytes, serializedSizeInBytes);
+			sumSerializationSizeInBytes += serializedSizeInBytes;
+			sumSerializationSizeInBytesSquared += serializedSizeInBytes
+					* serializedSizeInBytes;
+			double distinctCountEstimationError = distinctCountEstimate
+					- trueDistinctCount;
+			sumDistinctCountEstimationError += distinctCountEstimationError;
+			sumDistinctCountEstimationErrorSquared +=
+					distinctCountEstimationError * distinctCountEstimationError;
+		}
 	}
 
 	double getAverageSerializationSizeInBytes() const {
@@ -212,7 +111,7 @@ public:
 	}
 
 	double getRelativeEstimationRmse() const {
-		return std::sqrt(sumDistinctCountEstimationErrorSquared / count)
+		return sqrt(sumDistinctCountEstimationErrorSquared / count)
 				/ trueDistinctCount;
 	}
 
@@ -249,28 +148,63 @@ public:
 				/ (static_cast<double>(count) * trueDistinctCount
 						* trueDistinctCount);
 	}
+
+	double getStandardDeviationInMemorySizeInBytes() const {
+		return sqrt(
+				count * sumInMemorySizeInBytesSquared
+						- sumInMemorySizeInBytes * sumInMemorySizeInBytes)
+				/ static_cast<double>(count);
+	}
+
+	double getStandardDeviationSerializationSizeInBytes() const {
+		return sqrt(
+				count * sumSerializationSizeInBytesSquared
+						- sumSerializationSizeInBytes
+								* sumSerializationSizeInBytes)
+				/ static_cast<double>(count);
+	}
 };
 
 template<typename T> void test(const T &config = T()) {
 
-	std::mt19937_64 rng(0);
+	uint64_t num_cycles = 1000000;
 
-	uint64_t num_cycles = 100000;
-
-	std::vector < uint64_t > distinct_counts;
+	vector < uint64_t > distinct_counts;
 	distinct_counts.push_back(1);
+	distinct_counts.push_back(2);
+	distinct_counts.push_back(5);
 	distinct_counts.push_back(10);
+	distinct_counts.push_back(20);
+	distinct_counts.push_back(50);
 	distinct_counts.push_back(100);
+	distinct_counts.push_back(200);
+	distinct_counts.push_back(500);
 	distinct_counts.push_back(1000);
+	distinct_counts.push_back(2000);
+	distinct_counts.push_back(5000);
 	distinct_counts.push_back(10000);
+	distinct_counts.push_back(20000);
+	distinct_counts.push_back(50000);
 	distinct_counts.push_back(100000);
+	distinct_counts.push_back(200000);
+	distinct_counts.push_back(500000);
 	distinct_counts.push_back(1000000);
-	std::vector<Statistics> data;
+	vector<Statistics> data;
 	for (uint64_t distinct_count : distinct_counts) {
 		data.emplace_back(distinct_count);
 	}
 
+	mt19937_64 seed_rng(0);
+	vector < uint64_t > seeds;
 	for (uint64_t i = 0; i < num_cycles; ++i) {
+		seeds.push_back(seed_rng());
+	}
+
+#pragma omp parallel for
+	for (uint64_t i = 0; i < num_cycles; ++i) {
+
+		mt19937_64 rng(seeds[i]);
+
 		auto sketch = config.create();
 
 		uint64_t distinct_counts_idx = 0;
@@ -290,47 +224,47 @@ template<typename T> void test(const T &config = T()) {
 		}
 	}
 
-	std::ofstream o(
-			"results/comparison-empirical-mvp/" + config.getLabel() + ".csv");
+	ofstream o(
+			"../results/comparison-empirical-mvp/" + config.getLabel()
+					+ ".csv");
 
 	o << "number of cycles = " << num_cycles << "; data structure = "
-			<< config.getLabel() << std::endl;
+			<< config.getLabel() << endl;
 	o << "true distinct count";
 	o << "; minimum memory size";
 	o << "; average memory size";
 	o << "; maximum memory size";
+	o << "; standard deviation memory size";
 	o << "; minimum serialization size";
 	o << "; average serialization size";
 	o << "; maximum serialization size";
+	o << "; standard deviation serialization size";
 	o << "; relative distinct count estimation bias";
 	o << "; relative distinct count estimation rmse";
 	o << "; estimated memory MVP";
 	o << "; estimated serialization MVP";
-	o << std::endl;
+	o << endl;
 
 	for (Statistics s : data) {
 		o << s.getTrueDistinctCount();
 		o << "; " << s.getMinimumInMemorySizeInBytes();
 		o << "; " << s.getAverageInMemorySizeInBytes();
 		o << "; " << s.getMaximumInMemorySizeInBytes();
+		o << "; " << s.getStandardDeviationInMemorySizeInBytes();
 		o << "; " << s.getMinimumSerializationSizeInBytes();
 		o << "; " << s.getAverageSerializationSizeInBytes();
 		o << "; " << s.getMaximumSerializationSizeInBytes();
+		o << "; " << s.getStandardDeviationSerializationSizeInBytes();
 		o << "; " << s.getRelativeEstimationBias();
 		o << "; " << s.getRelativeEstimationRmse();
 		o << "; " << s.getEstimatedInMemoryMVP();
 		o << "; " << s.getEstimatedSerializationMVP();
-		o << std::endl;
+		o << endl;
 	}
 }
 
 int main() {
-#pragma omp parallel
-#pragma omp single
-	{
-#pragma omp task
-		test(HyperLogLogLogConfig(11));
-		test(SpikeSketchConfig(128));
-	}
+	test(HyperLogLogLogConfig(11));
+	test(SpikeSketchConfig(128));
 }
 

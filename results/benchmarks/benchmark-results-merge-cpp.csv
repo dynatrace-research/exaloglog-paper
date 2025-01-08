@@ -1,0 +1,21 @@
+dataSize=16; numRepetitions=10000
+data structure; distinct count; merge time (us)
+HyperLogLogLog (p=11); 1; 22.984
+HyperLogLogLog (p=11); 2; 22.9665
+HyperLogLogLog (p=11); 5; 23.0601
+HyperLogLogLog (p=11); 10; 23.1986
+HyperLogLogLog (p=11); 20; 23.4607
+HyperLogLogLog (p=11); 50; 24.2889
+HyperLogLogLog (p=11); 100; 25.7697
+HyperLogLogLog (p=11); 200; 28.9133
+HyperLogLogLog (p=11); 500; 37.9957
+HyperLogLogLog (p=11); 1000; 38.7419
+HyperLogLogLog (p=11); 2000; 31.4365
+HyperLogLogLog (p=11); 5000; 114.537
+HyperLogLogLog (p=11); 10000; 115.873
+HyperLogLogLog (p=11); 20000; 115.974
+HyperLogLogLog (p=11); 50000; 120.285
+HyperLogLogLog (p=11); 100000; 120.167
+HyperLogLogLog (p=11); 200000; 120.165
+HyperLogLogLog (p=11); 500000; 127.141
+HyperLogLogLog (p=11); 1000000; 127.151
