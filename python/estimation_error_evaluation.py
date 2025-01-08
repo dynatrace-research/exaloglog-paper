@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+# Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 #
 # This software and associated documentation files (the "Software")
 # are being made available by Dynatrace LLC for the sole purpose of
@@ -85,7 +85,7 @@ pvals = [4, 6, 8, 10]
 #     num_simulation_runs_unit = "M"
 
 fig, axs = plt.subplots(4, 4, sharex=True)
-fig.set_size_inches(11, 6)
+fig.set_size_inches(11, 5.5)
 
 for td_idx, td in enumerate(tdvals):
 
@@ -122,7 +122,7 @@ for td_idx, td in enumerate(tdvals):
         ax.set_xticks([pow(10.0, 3 * i) for i in range(0, 8)])
         # ax.xaxis.grid(True)
         if pidx == len(pvals) - 1:
-            ax.set_xlabel("distinct count")
+            ax.set_xlabel(r"distinct count $\symCardinality$")
         # ax.yaxis.grid(True)
         if td_idx == 0:
             ax.set_ylabel(r"relative error (\%)")
@@ -220,14 +220,14 @@ fig.legend(
     ncol=6,
     columnspacing=1,
     labelspacing=0.2,
-    # bbox_to_anchor=(0.52, 0.09),
+    bbox_to_anchor=(0.5, 0.0),
     borderpad=0.2,
     handletextpad=0.4,
     fancybox=False,
     framealpha=1,
 )
 fig.subplots_adjust(
-    top=0.99, bottom=0.15, left=0.045, right=0.989, wspace=0.13, hspace=0.07
+    top=0.99, bottom=0.13, left=0.045, right=0.989, wspace=0.13, hspace=0.07
 )
 
 fig.savefig(

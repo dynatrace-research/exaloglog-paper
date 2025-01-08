@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -26,19 +26,14 @@
 //
 package com.dynatrace.exaloglogpaper;
 
+import static com.dynatrace.exaloglogpaper.TestUtils.POW_0_5;
+import static com.dynatrace.exaloglogpaper.TestUtils.phi;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
+/** Unit test to verify Lemmma 1 in the paper. */
 public class LemmaTest {
-
-  private static final double[] POW_0_5 =
-      IntStream.range(0, 64).mapToDouble(i -> Math.pow(0.5, i)).toArray();
-
-  private static int phi(int k, int p, int t) {
-    return Math.min(t + 1 + ((k - 1) >>> t), 64 - p);
-  }
 
   private static double rhoUpdate(int k, int p, int t) {
     return POW_0_5[phi(k, p, t)];

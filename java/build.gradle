@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -27,6 +27,7 @@
 plugins {
 	id 'java'
 	id 'jacoco'
+	id 'me.champeau.jmh' version '0.7.2'
 }
 
 repositories {
@@ -34,15 +35,15 @@ repositories {
 }
 
 dependencies {
-	implementation 'com.dynatrace.hash4j:hash4j:0.18.0'
+	implementation 'com.dynatrace.hash4j:hash4j:0.19.0'
 	implementation group: 'org.hipparchus', name: 'hipparchus-stat', version: '3.1'
-	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.11.1'
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.11.4'
 	testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.26.3'
-	testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.11.1'
-	implementation group: 'org.apache.datasketches', name: 'datasketches-java', version:'6.1.0'
+	testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.11.4'
+	implementation group: 'org.apache.datasketches', name: 'datasketches-java', version:'6.1.1'
 	implementation group: 'org.apache.datasketches', name: 'datasketches-memory', version:'3.0.2'
 	implementation group: 'org.openjdk.jol', name: 'jol-core', version: '0.17'
-	testImplementation group: 'com.google.guava', name: 'guava', version: '33.3.1-jre'
+	testImplementation group: 'com.google.guava', name: 'guava', version: '33.4.0-jre'
 }
 
 test {
@@ -60,6 +61,20 @@ java {
 sourceSets {
 	main
 	test
+	jmh
+}
+
+jmh {
+	fork = 1
+	timeUnit = 'us'
+	failOnError = false
+	timeOnIteration = '1s'
+	warmupForks = 0
+	warmupIterations = 5
+	warmupBatchSize = 1
+	warmup = '1s'
+	iterations = 20
+	resultFormat = 'JSON'
 }
 
 
@@ -141,7 +156,6 @@ task "simulateEstimationErrors" {
 	dependsOn simulateExaloglogEstimationErrors, simulateTokenEstimationErrors
 }
 
-
 jacoco {
 	toolVersion = '0.8.11'
 }
@@ -174,5 +188,26 @@ tasks.withType(Test).configureEach {
 	maxHeapSize '8g'
 }
 
+
+tasks.register('copyBenchmarkReport', Copy) {
+	from('build/results/jmh/') {
+		include 'results.json'
+		rename 'results', 'benchmark-results-java'
+	}
+	into '../results/benchmarks'
+}
+
+tasks.register('deleteBenchmarkReport', Delete) {
+	delete 'build/results/jmh/results.json'
+}
+
 tasks.test.finalizedBy jacocoTestReport
 check.dependsOn jacocoTestCoverageVerification
+
+tasks.jmh.finalizedBy copyBenchmarkReport
+tasks.copyBenchmarkReport.finalizedBy deleteBenchmarkReport
+
+task runBenchmarks {
+	group 'main'
+	dependsOn ':java:jmh'
+}

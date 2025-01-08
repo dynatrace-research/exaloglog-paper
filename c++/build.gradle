@@ -1,0 +1,132 @@
+//
+// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+//
+// This software and associated documentation files (the "Software")
+// are being made available by Dynatrace LLC for the sole purpose of
+// illustrating the implementation of certain algorithms which have
+// been published by Dynatrace LLC. Permission is hereby granted,
+// free of charge, to any person obtaining a copy of the Software,
+// to view and use the Software for internal, non-production,
+// non-commercial purposes only – the Software may not be used to
+// process live data or distributed, sublicensed, modified and/or
+// sold either alone or as part of or in combination with any other
+// software.
+//
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+
+task buildEmpiricalMVPComputation (type: Exec) {
+	outputs.files "empiricalMvpComputation"
+	commandLine "g++", "-std=c++20", "-fopenmp", "-Wall", "-O2", "-Wl,--allow-multiple-definition", "empiricalMvpComputation.cpp", "SpikeSketch/SpikeSketch/main_extend.cpp", "SpikeSketch/SpikeSketch/utils/MurmurHash3.cpp", "SpikeSketch/SpikeSketch/impl/ss_query1.cpp", "-o", "empiricalMvpComputation"
+	standardOutput = new ByteArrayOutputStream()
+	outputs.upToDateWhen { false }
+}
+
+task buildInsertionPerformance (type: Exec) {
+	outputs.files "insertionPerformance"
+	commandLine "g++", "-std=c++20", "-Wall", "-O2", "-Wl,--allow-multiple-definition", "insertionPerformance.cpp", "SpikeSketch/SpikeSketch/main_extend.cpp", "SpikeSketch/SpikeSketch/utils/MurmurHash3.cpp", "SpikeSketch/SpikeSketch/impl/ss_query1.cpp", "-o", "insertionPerformance"
+	standardOutput = new ByteArrayOutputStream()
+	outputs.upToDateWhen { false }
+}
+
+task buildEstimationPerformance (type: Exec) {
+	outputs.files "estimationPerformance"
+	commandLine "g++", "-std=c++20", "-Wall", "-O2", "-Wl,--allow-multiple-definition", "estimationPerformance.cpp", "SpikeSketch/SpikeSketch/main_extend.cpp", "SpikeSketch/SpikeSketch/utils/MurmurHash3.cpp", "SpikeSketch/SpikeSketch/impl/ss_query1.cpp", "-o", "estimationPerformance"
+	standardOutput = new ByteArrayOutputStream()
+	outputs.upToDateWhen { false }
+}
+
+task buildMergePerformance (type: Exec) {
+	outputs.files "mergePerformance"
+	commandLine "g++", "-std=c++20", "-Wall", "-O2", "-Wl,--allow-multiple-definition", "mergePerformance.cpp", "SpikeSketch/SpikeSketch/main_extend.cpp", "SpikeSketch/SpikeSketch/utils/MurmurHash3.cpp", "SpikeSketch/SpikeSketch/impl/ss_query1.cpp", "SpikeSketch/SpikeSketch/merge.cpp", "-o", "mergePerformance"
+	standardOutput = new ByteArrayOutputStream()
+	outputs.upToDateWhen { false }
+}
+
+task buildMergeAndEstimationPerformance (type: Exec) {
+	outputs.files "mergeAndEstimationPerformance"
+	commandLine "g++", "-std=c++20", "-Wall", "-O2", "-Wl,--allow-multiple-definition", "mergeAndEstimationPerformance.cpp", "SpikeSketch/SpikeSketch/main_extend.cpp", "SpikeSketch/SpikeSketch/utils/MurmurHash3.cpp", "SpikeSketch/SpikeSketch/impl/ss_query1.cpp", "SpikeSketch/SpikeSketch/merge.cpp", "-o", "mergeAndEstimationPerformance"
+	standardOutput = new ByteArrayOutputStream()
+	outputs.upToDateWhen { false }
+}
+
+task runEmpiricalMVPComputation (type: Exec) {
+	inputs.files "empiricalMvpComputation"
+	outputs.files \
+			'../results/comparison-empirical-mvp/Apache Data Sketches Java CPC (p = 10).csv',
+			'../results/comparison-empirical-mvp/Apache Data Sketches Java HLL4 (p = 11).csv',
+			'../results/comparison-empirical-mvp/Apache Data Sketches Java HLL6 (p = 11).csv',
+			'../results/comparison-empirical-mvp/Apache Data Sketches Java HLL8 (p = 11).csv',
+			'../results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 0, p = 11).csv',
+			'../results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 1, p = 10).csv',
+			'../results/comparison-empirical-mvp/ExaLogLog (t = 0, d = 2, p = 10).csv',
+			'../results/comparison-empirical-mvp/ExaLogLog (t = 1, d = 9, p = 9).csv',
+			'../results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 16, p = 8).csv',
+			'../results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 20, p = 8).csv',
+			'../results/comparison-empirical-mvp/ExaLogLog (t = 2, d = 24, p = 8).csv',
+			'../results/comparison-empirical-mvp/Hash4j HyperLogLog (p = 11).csv',
+			'../results/comparison-empirical-mvp/Hash4j UltraLogLog (p = 10).csv',
+			'../results/comparison-empirical-mvp/HyperLogLogLog (p = 11).csv',
+			'../results/comparison-empirical-mvp/SpikeSketch (numOfBuckets = 128).csv'
+	standardOutput = new ByteArrayOutputStream()
+	commandLine "./empiricalMvpComputation"
+	dependsOn buildEmpiricalMVPComputation
+}
+
+task runInsertionBenchmark (type: Exec) {
+	inputs.files "insertionPerformance"
+	outputs.files \
+			'../results/benchmark-results-insertion-cpp.csv'
+	standardOutput = new ByteArrayOutputStream()
+	commandLine "./insertionPerformance"
+	dependsOn buildInsertionPerformance
+	outputs.upToDateWhen { false }
+}
+
+
+task runEstimationBenchmark (type: Exec) {
+	inputs.files "./estimationPerformance"
+	outputs.files \
+			'../results/benchmark-results-estimation-cpp.csv'
+	standardOutput = new ByteArrayOutputStream()
+	commandLine "./estimationPerformance"
+	dependsOn buildEstimationPerformance
+	outputs.upToDateWhen { false }
+}
+
+task runMergeBenchmark (type: Exec) {
+	inputs.files "./mergePerformance"
+	outputs.files \
+			'../results/benchmark-results-merge-cpp.csv'
+	standardOutput = new ByteArrayOutputStream()
+	commandLine "./mergePerformance"
+	dependsOn buildMergePerformance
+	outputs.upToDateWhen { false }
+}
+
+task runMergeAndEstimationBenchmark (type: Exec) {
+	inputs.files "./mergeAndEstimationPerformance"
+	outputs.files \
+			'../results/benchmark-results-merge-and-estimation-cpp.csv'
+	standardOutput = new ByteArrayOutputStream()
+	commandLine "./mergeAndEstimationPerformance"
+	dependsOn buildMergeAndEstimationPerformance
+	outputs.upToDateWhen { false }
+}
+
+
+task runBenchmarks {
+	group 'main'
+	dependsOn 'runInsertionBenchmark', 'runEstimationBenchmark', 'runMergeBenchmark', 'runMergeAndEstimationBenchmark'
+}
+

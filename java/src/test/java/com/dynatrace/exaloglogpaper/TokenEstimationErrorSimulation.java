@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -26,6 +26,7 @@
 //
 package com.dynatrace.exaloglogpaper;
 
+import com.dynatrace.exaloglogpaper.DistinctCountUtil.SolverStatistics;
 import com.dynatrace.hash4j.random.PseudoRandomGenerator;
 import com.dynatrace.hash4j.random.PseudoRandomGeneratorProvider;
 import java.io.FileWriter;
@@ -35,7 +36,6 @@ import java.util.Arrays;
 import java.util.SplittableRandom;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
@@ -75,7 +75,7 @@ public class TokenEstimationErrorSimulation {
     // parameters
     int numCycles = 100_000;
     int maxDistinctCount = 100_000;
-    int maxParallelism = 16;
+    int maxParallelism = 96;
     long[] targetDistinctCounts = TestUtils.getDistinctCountValues(1, maxDistinctCount, 0.05);
 
     SplittableRandom seedRandom = new SplittableRandom(0x9dcd409500d9acedL);
@@ -121,13 +121,14 @@ public class TokenEstimationErrorSimulation {
                                 trueDistinctCount += 1;
                               }
                               Arrays.sort(tokens, 0, tokenCounter);
-                              AtomicLong iterationCounter = new AtomicLong();
+                              SolverStatistics solverStatistics = new SolverStatistics();
                               estimatedDistinctCounts[distinctCountIndex][i] =
-                                  DistinctCountUtil.estimateDistinctCountFromTokens(
+                                  DistinctCountUtil.estimateDistinctCountFromSortedTokens(
                                       fromSortedArray(tokens, tokenCounter),
                                       tokenParameter,
-                                      iterationCounter);
-                              numIterations[distinctCountIndex][i] = iterationCounter.get();
+                                      solverStatistics);
+                              numIterations[distinctCountIndex][i] =
+                                  solverStatistics.iterationCounter;
                             }
                           }))
           .get();

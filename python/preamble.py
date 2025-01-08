@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+# Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 #
 # This software and associated documentation files (the "Software")
 # are being made available by Dynatrace LLC for the sole purpose of
@@ -40,3 +40,79 @@ matplotlib.use("PDF")
 
 plt.rc("text", usetex=True)
 plt.rc("text.latex", preamble=latex_preamble)
+
+
+algorithm_styles = {
+    "ULTRALOGLOG_10": (r"Hash4j ULL ($\symPrecision=10$)", "C1", "solid", None, 2),
+    "HYPERLOGLOG_11": (r"Hash4j HLL ($\symPrecision=11$)", "C1", "dotted", None, 2),
+    "EXALOGLOG_2_20_8": (
+        r"ELL ($\symExtraBits=2$, $\symNumExtraBits=20$, $\symPrecision=8$, ML)",
+        "k",
+        "solid",
+        None,
+        2.5,
+    ),
+    "EXALOGLOG_2_20_8_MARTINGALE": (
+        r"ELL ($\symExtraBits=2$, $\symNumExtraBits=20$, $\symPrecision=8$, marting.)",
+        "k",
+        (0, (5, 1)),
+        None,
+        2.5,
+    ),
+    "EXALOGLOG_2_24_8": (
+        r"ELL ($\symExtraBits=2$, $\symNumExtraBits=24$, $\symPrecision=8$, ML)",
+        "k",
+        (0, (1, 1)),
+        None,
+        2.5,
+    ),
+    "EXALOGLOG_2_24_8_MARTINGALE": (
+        r"ELL ($\symExtraBits=2$, $\symNumExtraBits=24$, $\symPrecision=8$, marting.)",
+        "k",
+        (0, (3, 1, 1, 1)),
+        None,
+        2.5,
+    ),
+    "APACHE_DATA_SKETCHES_CPC_10": (
+        r"DataSketches CPC ($\symPrecision=10$)",
+        "C9",
+        "dashdot",
+        None,
+        2.1,
+    ),
+    "APACHE_DATA_SKETCHES_HLL4_11": (
+        r"DataSketches HLL (4-bit, $\symPrecision=11$)",
+        "C3",
+        "solid",
+        None,
+        2,
+    ),
+    "APACHE_DATA_SKETCHES_HLL6_11": (
+        r"DataSketches HLL (6-bit, $\symPrecision=11$)",
+        "C3",
+        "dashed",
+        None,
+        2,
+    ),
+    "APACHE_DATA_SKETCHES_HLL8_11": (
+        r"DataSketches HLL (8-bit, $\symPrecision=11$)",
+        "C3",
+        (0, (1, 1)),
+        None,
+        2,
+    ),
+    "HyperLogLogLog (p=11)": (
+        r"HyperLogLogLog (\symPrecision=11)",
+        "C0",
+        (0, (3, 1, 1, 1, 1, 1)),
+        None,
+        2.1,
+    ),
+    "SpikeSketch (128 buckets)": (
+        r"SpikeSketch (128 buckets)",
+        "C2",
+        "dashdot",
+        None,
+        2,
+    ),
+}

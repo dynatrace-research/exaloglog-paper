@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -43,7 +43,7 @@ class MartingaleEstimatorTest {
   @Test
   void testConstructorWithNegativeZeroStateChangeProbability() {
     MartingaleEstimator estimator = new MartingaleEstimator(0, -0.0);
-    estimator.stateChanged(0.5);
+    estimator.decrementStateChangeProbability(0.5);
     assertThat(estimator.getDistinctCountEstimate()).isPositive().isInfinite();
   }
 
@@ -63,9 +63,12 @@ class MartingaleEstimatorTest {
     assertThat(estimator.getDistinctCountEstimate()).isZero();
     assertThat(estimator.getStateChangeProbability()).isOne();
     for (int i = 1; i <= 100; ++i) {
-      estimator.stateChanged(Math.pow(0.5, i));
+      estimator.decrementStateChangeProbability(Math.pow(0.5, i));
+      MartingaleEstimator copy = estimator.copy();
       assertThat(estimator.getStateChangeProbability()).isEqualTo(Math.pow(0.5, i));
       assertThat(estimator.getDistinctCountEstimate()).isEqualTo(Math.pow(2., i) - 1.);
+      assertThat(copy.getStateChangeProbability()).isEqualTo(Math.pow(0.5, i));
+      assertThat(copy.getDistinctCountEstimate()).isEqualTo(Math.pow(2., i) - 1.);
     }
   }
 

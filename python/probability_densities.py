@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+# Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 #
 # This software and associated documentation files (the "Software")
 # are being made available by Dynatrace LLC for the sole purpose of
@@ -81,7 +81,7 @@ def plot_x(ax, t):
 plot_x(ax[0], t=1)
 plot_x(ax[1], t=2)
 
-fig.subplots_adjust(left=0.09, bottom=0.11, right=0.992, top=0.985, wspace=0.3)
+fig.subplots_adjust(left=0.09, bottom=0.112, right=0.992, top=0.985, wspace=0.3)
 fig.savefig(
     "paper/probability_densities.pdf",
     format="pdf",

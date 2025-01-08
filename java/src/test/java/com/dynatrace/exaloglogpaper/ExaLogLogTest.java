@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -27,6 +27,7 @@
 package com.dynatrace.exaloglogpaper;
 
 import static com.dynatrace.exaloglogpaper.ExaLogLog.*;
+import static com.dynatrace.exaloglogpaper.TestUtils.hurvitzZeta;
 import static java.lang.Math.pow;
 import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
@@ -42,9 +43,8 @@ import com.google.common.collect.Sets;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
-import java.util.function.BiFunction;
 import java.util.function.DoubleUnaryOperator;
-import java.util.function.IntToDoubleFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -351,39 +351,24 @@ public abstract class ExaLogLogTest {
       int p,
       long seed,
       long[] distinctCounts,
-      List<ExaLogLog.Estimator> estimators,
-      List<IntToDoubleFunction> pToTheoreticalRelativeStandardErrorFunctions,
-      double[] relativeBiasThresholds,
-      double[] relativeRmseThresholds,
-      double[] asymptoticThresholds,
+      double relativeBiasThresholdML,
+      double relativeRmseThresholdML,
+      double asymptoticThresholdML,
       double relativeBiasThresholdMartingale,
       double relativeRmseThresholdMartingale,
-      double asymptoticThresholdMartingale,
-      ExaLogLog.Estimator defaultEstimator) {
+      double asymptoticThresholdMartingale) {
 
     int numIterations = 1000;
     SplittableRandom random = new SplittableRandom(seed);
 
-    assertThat(estimators.size())
-        .isEqualTo(relativeBiasThresholds.length)
-        .isEqualTo(relativeRmseThresholds.length)
-        .isEqualTo(asymptoticThresholds.length)
-        .isEqualTo(pToTheoreticalRelativeStandardErrorFunctions.size());
-    int numEstimators = estimators.size();
+    double[] estimationErrorsMoment1ML = new double[distinctCounts.length];
+    double[] estimationErrorsMoment2ML = new double[distinctCounts.length];
+    double[] estimationErrorsMoment1Martingale = new double[distinctCounts.length];
+    double[] estimationErrorsMoment2Martingale = new double[distinctCounts.length];
 
-    double[] theoreticalRelativeStandardErrors = new double[numEstimators + 1];
-    double[][] estimationErrorsMoment1 = new double[numEstimators + 1][];
-    double[][] estimationErrorsMoment2 = new double[numEstimators + 1][];
-    for (int i = 0; i < numEstimators + 1; ++i) {
-      estimationErrorsMoment1[i] = new double[distinctCounts.length];
-      estimationErrorsMoment2[i] = new double[distinctCounts.length];
-    }
-
-    for (int i = 0; i < numEstimators; ++i) {
-      theoreticalRelativeStandardErrors[i] =
-          pToTheoreticalRelativeStandardErrorFunctions.get(i).applyAsDouble(p);
-    }
-    theoreticalRelativeStandardErrors[numEstimators] =
+    double theoreticalRelativeStandardErrorML =
+        PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), p);
+    double theoreticalRelativeStandardErrorMartingale =
         PrecomputedConstants.getTheoreticalRelativeErrorMartingale(getT(), getD(), p);
 
     for (int i = 0; i < numIterations; ++i) {
@@ -394,24 +379,16 @@ public abstract class ExaLogLogTest {
       int distinctCountIndex = 0;
       while (distinctCountIndex < distinctCounts.length) {
         if (trueDistinctCount == distinctCounts[distinctCountIndex]) {
-          for (int estimatorIdx = 0; estimatorIdx < numEstimators; ++estimatorIdx) {
-            ExaLogLog.Estimator estimator = estimators.get(estimatorIdx);
-            double estimate = sketch.getDistinctCountEstimate(estimator);
-            if (defaultEstimator.equals(estimator)) {
-              assertThat(sketch.getDistinctCountEstimate(defaultEstimator)).isEqualTo(estimate);
-            }
-            double distinctCountEstimationError = estimate - trueDistinctCount;
-            estimationErrorsMoment1[estimatorIdx][distinctCountIndex] +=
-                distinctCountEstimationError;
-            estimationErrorsMoment2[estimatorIdx][distinctCountIndex] +=
-                distinctCountEstimationError * distinctCountEstimationError;
-          }
-
+          double distinctCountEstimationErrorML =
+              sketch.getDistinctCountEstimate() - trueDistinctCount;
+          estimationErrorsMoment1ML[distinctCountIndex] += distinctCountEstimationErrorML;
+          estimationErrorsMoment2ML[distinctCountIndex] +=
+              distinctCountEstimationErrorML * distinctCountEstimationErrorML;
           double distinctCountEstimationErrorMartingale =
               martingaleEstimator.getDistinctCountEstimate() - trueDistinctCount;
-          estimationErrorsMoment1[numEstimators][distinctCountIndex] +=
+          estimationErrorsMoment1Martingale[distinctCountIndex] +=
               distinctCountEstimationErrorMartingale;
-          estimationErrorsMoment2[numEstimators][distinctCountIndex] +=
+          estimationErrorsMoment2Martingale[distinctCountIndex] +=
               distinctCountEstimationErrorMartingale * distinctCountEstimationErrorMartingale;
 
           distinctCountIndex += 1;
@@ -432,63 +409,39 @@ public abstract class ExaLogLogTest {
         ++distinctCountIndex) {
       long trueDistinctCount = distinctCounts[distinctCountIndex];
 
-      for (int estimatorIdx = 0; estimatorIdx < numEstimators; ++estimatorIdx) {
-        double relativeBias =
-            estimationErrorsMoment1[estimatorIdx][distinctCountIndex]
-                / (trueDistinctCount
-                    * (double) numIterations
-                    * theoreticalRelativeStandardErrors[estimatorIdx]);
-        double relativeRmse =
-            Math.sqrt(estimationErrorsMoment2[estimatorIdx][distinctCountIndex] / numIterations)
-                / (trueDistinctCount * theoreticalRelativeStandardErrors[estimatorIdx]);
+      double relativeBiasML =
+          estimationErrorsMoment1ML[distinctCountIndex]
+              / (trueDistinctCount * (double) numIterations * theoreticalRelativeStandardErrorML);
+      double relativeRmseML =
+          Math.sqrt(estimationErrorsMoment2ML[distinctCountIndex] / numIterations)
+              / (trueDistinctCount * theoreticalRelativeStandardErrorML);
 
-        double relativeBiasThreshold = relativeBiasThresholds[estimatorIdx];
-        double relativeRmseThreshold = relativeRmseThresholds[estimatorIdx];
-        double asymptoticThreshold = asymptoticThresholds[estimatorIdx];
+      double relativeBiasMartingale =
+          estimationErrorsMoment1Martingale[distinctCountIndex]
+              / (trueDistinctCount
+                  * (double) numIterations
+                  * theoreticalRelativeStandardErrorMartingale);
+      double relativeRmseMartingale =
+          Math.sqrt(estimationErrorsMoment2Martingale[distinctCountIndex] / numIterations)
+              / (trueDistinctCount * theoreticalRelativeStandardErrorMartingale);
 
-        if (trueDistinctCount > 0) {
-          // verify bias to be significantly smaller than standard error
-          assertThat(Math.abs(relativeBias)).isLessThan(relativeBiasThreshold);
-        }
-        if (trueDistinctCount > 0) {
-          // test if observed root mean square error is not much greater than relative standard
-          // error
-          assertThat(relativeRmse).isLessThan(relativeRmseThreshold);
-        }
-        if (trueDistinctCount > 10 * (1L << p)) {
-          // test asymptotic behavior (distinct count is much greater than number of registers
-          // (state size) given by (1 << p)
-          // observed root mean square error should be approximately equal to the standard error
-          assertThat(relativeRmse).isCloseTo(1., within(asymptoticThreshold));
-        }
+      if (trueDistinctCount > 0) {
+        // verify bias to be significantly smaller than standard error
+        assertThat(Math.abs(relativeBiasML)).isLessThan(relativeBiasThresholdML);
+        assertThat(Math.abs(relativeBiasMartingale)).isLessThan(relativeBiasThresholdMartingale);
       }
-
-      {
-        double relativeBiasMartingale =
-            estimationErrorsMoment1[numEstimators][distinctCountIndex]
-                / (trueDistinctCount
-                    * (double) numIterations
-                    * theoreticalRelativeStandardErrors[numEstimators]);
-        double relativeRmseMartingale =
-            Math.sqrt(estimationErrorsMoment2[numEstimators][distinctCountIndex] / numIterations)
-                / (trueDistinctCount * theoreticalRelativeStandardErrors[numEstimators]);
-
-        if (trueDistinctCount > 0) {
-          // verify bias to be significantly smaller than standard error
-          // System.out.println(trueDistinctCount + " " + p);
-          assertThat(Math.abs(relativeBiasMartingale)).isLessThan(relativeBiasThresholdMartingale);
-        }
-        if (trueDistinctCount > 0) {
-          // test if observed root mean square error is not much greater than relative standard
-          // error
-          assertThat(relativeRmseMartingale).isLessThan(relativeRmseThresholdMartingale);
-        }
-        if (trueDistinctCount > 10 * (1L << p)) {
-          // test asymptotic behavior (distinct count is much greater than number of registers
-          // (state size) given by (1 << p)
-          // observed root mean square error should be approximately equal to the standard error
-          assertThat(relativeRmseMartingale).isCloseTo(1., within(asymptoticThresholdMartingale));
-        }
+      if (trueDistinctCount > 0) {
+        // test if observed root mean square error is not much greater than relative standard
+        // error
+        assertThat(relativeRmseML).isLessThan(relativeRmseThresholdML);
+        assertThat(relativeRmseMartingale).isLessThan(relativeRmseThresholdMartingale);
+      }
+      if (trueDistinctCount > 10 * (1L << p)) {
+        // test asymptotic behavior (distinct count is much greater than number of registers
+        // (state size) given by (1 << p)
+        // observed root mean square error should be approximately equal to the standard error
+        assertThat(relativeRmseML).isCloseTo(1., within(asymptoticThresholdML));
+        assertThat(relativeRmseMartingale).isCloseTo(1., within(asymptoticThresholdMartingale));
       }
     }
   }
@@ -497,25 +450,20 @@ public abstract class ExaLogLogTest {
       int p,
       long seed,
       long distinctCount,
-      List<ExaLogLog.Estimator> estimators,
-      List<IntToDoubleFunction> pToTheoreticalRelativeStandardErrorFunctions,
       double relativeBiasThreshold,
       double relativeRmseThreshold) {
 
     int numIterations = 1000;
 
-    int numEstimators = estimators.size();
-
-    double[] theoreticalRelativeStandardErrors = new double[numEstimators + 1];
-    double[] estimationErrorsMoment1 = new double[numEstimators + 1];
-    double[] estimationErrorsMoment2 = new double[numEstimators + 1];
-
-    for (int i = 0; i < numEstimators; ++i) {
-      theoreticalRelativeStandardErrors[i] =
-          pToTheoreticalRelativeStandardErrorFunctions.get(i).applyAsDouble(p);
-    }
-    theoreticalRelativeStandardErrors[numEstimators] =
+    double theoreticalRelativeStandardErrorML =
+        PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), p);
+    double theoreticalRelativeStandardErrorMartingale =
         PrecomputedConstants.getTheoreticalRelativeErrorMartingale(getT(), getD(), p);
+
+    double estimationErrorsMoment1ML = 0;
+    double estimationErrorsMoment2ML = 0;
+    double estimationErrorsMoment1Martingale = 0;
+    double estimationErrorsMoment2Martingale = 0;
 
     List<HashGenerator> hashGenerators = getHashGenerators(p);
     TestUtils.Transition[] transitions = new TestUtils.Transition[hashGenerators.size() * (1 << p)];
@@ -540,34 +488,38 @@ public abstract class ExaLogLogTest {
         transitionIndex += 1;
       }
 
-      for (int estimatorIdx = 0; estimatorIdx < numEstimators; ++estimatorIdx) {
-        ExaLogLog.Estimator estimator = estimators.get(estimatorIdx);
-        double estimate = sketch.getDistinctCountEstimate(estimator);
+      {
+        double estimate = sketch.getDistinctCountEstimate();
         double distinctCountEstimationError = estimate - distinctCount;
-        estimationErrorsMoment1[estimatorIdx] += distinctCountEstimationError;
-        estimationErrorsMoment2[estimatorIdx] +=
-            distinctCountEstimationError * distinctCountEstimationError;
+        estimationErrorsMoment1ML += distinctCountEstimationError;
+        estimationErrorsMoment2ML += distinctCountEstimationError * distinctCountEstimationError;
       }
       {
         double estimate = martingaleEstimator.getDistinctCountEstimate();
         double distinctCountEstimationError = estimate - distinctCount;
-        estimationErrorsMoment1[numEstimators] += distinctCountEstimationError;
-        estimationErrorsMoment2[numEstimators] +=
+        estimationErrorsMoment1Martingale += distinctCountEstimationError;
+        estimationErrorsMoment2Martingale +=
             distinctCountEstimationError * distinctCountEstimationError;
       }
     }
 
-    for (int estimatorIdx = 0; estimatorIdx <= numEstimators; ++estimatorIdx) {
-      double relativeBias =
-          Math.abs(estimationErrorsMoment1[estimatorIdx] / numIterations)
-              / (distinctCount * theoreticalRelativeStandardErrors[estimatorIdx]);
-      double relativeRmse =
-          Math.sqrt(estimationErrorsMoment2[estimatorIdx] / numIterations)
-              / (distinctCount * theoreticalRelativeStandardErrors[estimatorIdx]);
+    double relativeBiasML =
+        Math.abs(estimationErrorsMoment1ML / numIterations)
+            / (distinctCount * theoreticalRelativeStandardErrorML);
+    double relativeRmseML =
+        Math.sqrt(estimationErrorsMoment2ML / numIterations)
+            / (distinctCount * theoreticalRelativeStandardErrorML);
+    double relativeBiasMartingale =
+        Math.abs(estimationErrorsMoment1Martingale / numIterations)
+            / (distinctCount * theoreticalRelativeStandardErrorMartingale);
+    double relativeRmseMartingale =
+        Math.sqrt(estimationErrorsMoment2Martingale / numIterations)
+            / (distinctCount * theoreticalRelativeStandardErrorMartingale);
 
-      assertThat(relativeBias).isCloseTo(0., within(relativeBiasThreshold));
-      assertThat(relativeRmse).isCloseTo(1., within(relativeRmseThreshold));
-    }
+    assertThat(relativeBiasML).isCloseTo(0., within(relativeBiasThreshold));
+    assertThat(relativeRmseML).isCloseTo(1., within(relativeRmseThreshold));
+    assertThat(relativeBiasMartingale).isCloseTo(0., within(relativeBiasThreshold));
+    assertThat(relativeRmseMartingale).isCloseTo(1., within(relativeRmseThreshold));
   }
 
   @Test
@@ -575,15 +527,9 @@ public abstract class ExaLogLogTest {
     for (int p = getMinP(); p <= getMaxP(getT()); ++p) {
       ExaLogLog sketch = create(p);
       assertThat(sketch.getDistinctCountEstimate()).isZero();
-      for (ExaLogLog.Estimator estimator : getEstimators()) {
-        assertThat(estimator.estimate(sketch)).isZero();
-      }
       ExaLogLog mergedSketch = merge(sketch, sketch);
       assertThat(mergedSketch.getState()).isEqualTo(new byte[getStateLength(p)]);
       assertThat(mergedSketch.getDistinctCountEstimate()).isZero();
-      for (ExaLogLog.Estimator estimator : getEstimators()) {
-        assertThat(estimator.estimate(mergedSketch)).isZero();
-      }
       assertThat(sketch.getStateChangeProbability()).isOne();
     }
   }
@@ -593,9 +539,6 @@ public abstract class ExaLogLogTest {
     for (int p = getMinP(); p <= getMaxP(getT()); p += 1) {
       ExaLogLog sketch = wrap(new byte[getStateLength(p)]);
       assertThat(sketch.getDistinctCountEstimate()).isZero();
-      for (ExaLogLog.Estimator estimator : getEstimators()) {
-        assertThat(estimator.estimate(sketch)).isZero();
-      }
     }
   }
 
@@ -618,10 +561,6 @@ public abstract class ExaLogLogTest {
       int newP2 = random.nextInt(minP, maxP + 1);
       assertThatNoException().isThrownBy(sketch1::getDistinctCountEstimate);
       assertThatNoException().isThrownBy(sketch2::getDistinctCountEstimate);
-      for (ExaLogLog.Estimator estimator : getEstimators()) {
-        assertThatNoException().isThrownBy(() -> estimator.estimate(sketch1));
-        assertThatNoException().isThrownBy(() -> estimator.estimate(sketch2));
-      }
       assertThatNoException().isThrownBy(sketch1::copy);
       assertThatNoException().isThrownBy(sketch2::copy);
       assertThatNoException().isThrownBy(() -> sketch1.downsize(getD(), newP1));
@@ -669,9 +608,6 @@ public abstract class ExaLogLogTest {
           c += 1;
         }
         assertThatNoException().isThrownBy(() -> wrap(b).getDistinctCountEstimate());
-        for (ExaLogLog.Estimator estimator : getEstimators()) {
-          assertThatNoException().isThrownBy(() -> estimator.estimate(wrap(b)));
-        }
       }
     }
   }
@@ -702,48 +638,24 @@ public abstract class ExaLogLogTest {
   }
 
   protected void testErrorOfDistinctCountEqualOne(
-      int[] pValues,
-      ExaLogLog.Estimator estimator,
-      IntToDoubleFunction pToTheoreticalRelativeStandardError,
-      double[] relativeBiasLimit,
-      double[] relativeRmseLimit) {
+      int[] pValues, double[] relativeBiasLimit, double[] relativeRmseLimit) {
 
     testErrorOfDistinctCount(
-        pValues,
-        estimator,
-        pToTheoreticalRelativeStandardError,
-        relativeBiasLimit,
-        relativeRmseLimit,
-        this::calculateErrorOfDistinctCountEqualOne);
+        pValues, relativeBiasLimit, relativeRmseLimit, this::calculateErrorOfDistinctCountEqualOne);
   }
 
   protected void testErrorOfDistinctCountEqualTwo(
-      int[] pValues,
-      ExaLogLog.Estimator estimator,
-      IntToDoubleFunction pToTheoreticalRelativeStandardError,
-      double[] relativeBiasLimit,
-      double[] relativeRmseLimit) {
+      int[] pValues, double[] relativeBiasLimit, double[] relativeRmseLimit) {
 
     testErrorOfDistinctCount(
-        pValues,
-        estimator,
-        pToTheoreticalRelativeStandardError,
-        relativeBiasLimit,
-        relativeRmseLimit,
-        this::calculateErrorOfDistinctCountEqualTwo);
+        pValues, relativeBiasLimit, relativeRmseLimit, this::calculateErrorOfDistinctCountEqualTwo);
   }
 
   protected void testErrorOfDistinctCountEqualThree(
-      int[] pValues,
-      ExaLogLog.Estimator estimator,
-      IntToDoubleFunction pToTheoreticalRelativeStandardError,
-      double[] relativeBiasLimit,
-      double[] relativeRmseLimit) {
+      int[] pValues, double[] relativeBiasLimit, double[] relativeRmseLimit) {
 
     testErrorOfDistinctCount(
         pValues,
-        estimator,
-        pToTheoreticalRelativeStandardError,
         relativeBiasLimit,
         relativeRmseLimit,
         this::calculateErrorOfDistinctCountEqualThree);
@@ -751,20 +663,18 @@ public abstract class ExaLogLogTest {
 
   private void testErrorOfDistinctCount(
       int[] pValues,
-      ExaLogLog.Estimator estimator,
-      IntToDoubleFunction pToTheoreticalRelativeStandardError,
       double[] relativeBiasLimit,
       double[] relativeRmseLimit,
-      BiFunction<Integer, ExaLogLog.Estimator, double[]> errorCalculator) {
+      Function<Integer, double[]> errorCalculator) {
 
     double[] relativeBiasValues = new double[pValues.length];
     double[] relativeRmseValues = new double[pValues.length];
     for (int i = 0; i < pValues.length; ++i) {
-      double[] r = errorCalculator.apply(pValues[i], estimator);
+      double[] r = errorCalculator.apply(pValues[i]);
       double bias = r[0];
       double rmse = r[1];
       double theoreticalRelativeError =
-          pToTheoreticalRelativeStandardError.applyAsDouble(pValues[i]);
+          PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), pValues[i]);
       relativeBiasValues[i] = bias / theoreticalRelativeError;
       relativeRmseValues[i] = rmse / theoreticalRelativeError;
     }
@@ -799,7 +709,7 @@ public abstract class ExaLogLogTest {
     }
   }
 
-  private double[] calculateErrorOfDistinctCountEqualOne(int p, ExaLogLog.Estimator estimator) {
+  private double[] calculateErrorOfDistinctCountEqualOne(int p) {
     ExaLogLog sketch = create(p);
     double sumProbability = 0;
     double averageBias = 0;
@@ -814,7 +724,7 @@ public abstract class ExaLogLogTest {
       sketch.add(hashGenerator1.generateHashValue(0));
       sumProbability += probProduct1;
 
-      double estimate = sketch.getDistinctCountEstimate(estimator);
+      double estimate = sketch.getDistinctCountEstimate();
       double error = estimate - trueDistinctCount;
       averageBias += probProduct1 * error;
       averageRmse += probProduct1 * (error * error);
@@ -829,7 +739,7 @@ public abstract class ExaLogLogTest {
     return new double[] {Math.abs(relativeBias), relativeRmse};
   }
 
-  private double[] calculateErrorOfDistinctCountEqualTwo(int p, ExaLogLog.Estimator estimator) {
+  private double[] calculateErrorOfDistinctCountEqualTwo(int p) {
 
     long m = 1L << p;
     ExaLogLog sketch = create(p);
@@ -852,7 +762,7 @@ public abstract class ExaLogLogTest {
           double probability = probProduct12;
           if (genIdx1 != genIdx2) probability *= 2;
           sumProbability += probability;
-          double estimate = sketch.getDistinctCountEstimate(estimator);
+          double estimate = sketch.getDistinctCountEstimate();
           double error = estimate - trueDistinctCount;
           averageBias += probability * error;
           averageRmse += probability * (error * error);
@@ -864,7 +774,7 @@ public abstract class ExaLogLogTest {
           double probability = (m - 1) * probProduct12;
           if (genIdx1 != genIdx2) probability *= 2;
           sumProbability += probability;
-          double estimate = sketch.getDistinctCountEstimate(estimator);
+          double estimate = sketch.getDistinctCountEstimate();
           double error = estimate - trueDistinctCount;
           averageBias += probability * error;
           averageRmse += probability * (error * error);
@@ -883,7 +793,7 @@ public abstract class ExaLogLogTest {
     return new double[] {relativeBias, relativeRmse};
   }
 
-  private double[] calculateErrorOfDistinctCountEqualThree(int p, ExaLogLog.Estimator estimator) {
+  private double[] calculateErrorOfDistinctCountEqualThree(int p) {
     long m = 1L << p;
     ExaLogLog sketch = create(p);
     double sumProbability = 0;
@@ -909,7 +819,7 @@ public abstract class ExaLogLogTest {
             double probability = probProduct123;
             if (genIdx1 != genIdx2) probability *= 2;
             sumProbability += probability;
-            double estimate = sketch.getDistinctCountEstimate(estimator);
+            double estimate = sketch.getDistinctCountEstimate();
             double error = estimate - trueDistinctCount;
             averageBias += probability * error;
             averageRmse += probability * (error * error);
@@ -922,7 +832,7 @@ public abstract class ExaLogLogTest {
             double probability = (3 * (m - 1)) * probProduct123;
             if (genIdx1 != genIdx2) probability *= 2;
             sumProbability += probability;
-            double estimate = sketch.getDistinctCountEstimate(estimator);
+            double estimate = sketch.getDistinctCountEstimate();
             double error = estimate - trueDistinctCount;
             averageBias += probability * error;
             averageRmse += probability * (error * error);
@@ -936,7 +846,7 @@ public abstract class ExaLogLogTest {
             double probability = ((m - 1) * (m - 2)) * probProduct123;
             if (genIdx1 != genIdx2) probability *= 2;
             sumProbability += probability;
-            double estimate = sketch.getDistinctCountEstimate(estimator);
+            double estimate = sketch.getDistinctCountEstimate();
             double error = estimate - trueDistinctCount;
             averageBias += probability * error;
             averageRmse += probability * (error * error);
@@ -976,9 +886,6 @@ public abstract class ExaLogLogTest {
     for (int p = getMinP(); p <= getMaxP(getT()); ++p) {
       ExaLogLog sketch = createFullSketch(p);
       assertThat(sketch.getDistinctCountEstimate()).isInfinite();
-      for (ExaLogLog.Estimator estimator : getEstimators()) {
-        assertThat(sketch.getDistinctCountEstimate(estimator)).isInfinite();
-      }
     }
   }
 
@@ -994,9 +901,6 @@ public abstract class ExaLogLogTest {
         assertThat(martingaleEstimator.getStateChangeProbability())
             .isEqualTo(stateChangeProbability);
         assertThat(sketch.getDistinctCountEstimate()).isFinite();
-        for (ExaLogLog.Estimator estimator : getEstimators()) {
-          assertThat(sketch.getDistinctCountEstimate(estimator)).isFinite();
-        }
         for (int k = 0; k < (1 << p); ++k) {
           sketch.add(hashGenerator.generateHashValue(k), martingaleEstimator);
         }
@@ -1006,9 +910,6 @@ public abstract class ExaLogLogTest {
       assertThat(sketch.getStateChangeProbability()).isZero();
       assertThat(martingaleEstimator.getStateChangeProbability()).isZero();
       assertThat(sketch.getDistinctCountEstimate()).isInfinite();
-      for (ExaLogLog.Estimator estimator : getEstimators()) {
-        assertThat(sketch.getDistinctCountEstimate(estimator)).isInfinite();
-      }
     }
   }
 
@@ -1061,17 +962,6 @@ public abstract class ExaLogLogTest {
 
   protected abstract int getD();
 
-  private static double hurvitzZeta(double x, double y) {
-    double sum = 0;
-    int u = 0;
-    while (true) {
-      double oldSum = sum;
-      sum += Math.pow(u + y, -x);
-      if (!(oldSum < sum)) return sum;
-      u += 1;
-    }
-  }
-
   protected static double calculateTheoreticalRelativeStandardErrorConstantML(int t, int d) {
     double b = 2;
     for (int i = 0; i < t; ++i) {
@@ -1089,25 +979,8 @@ public abstract class ExaLogLogTest {
     return Math.sqrt(0.5 * Math.log(b) * (1. + Math.pow(b, -d) / (b - 1.)));
   }
 
-  private static double calculateBiasCorrectionConstant(int t, int d) {
-    double b = 2;
-    for (int i = 0; i < t; ++i) {
-      b = Math.sqrt(b);
-    }
-    double x = Math.pow(b, -d) / (b - 1.);
-
-    return Math.log(b)
-        * (1. + 2. * x)
-        * hurvitzZeta(3., 1. + x)
-        / Math.pow(hurvitzZeta(2., 1. + x), 2);
-  }
-
   protected int getBitsPerRegister(int p) {
     return getD() + getT() + 6;
-  }
-
-  protected List<ExaLogLog.Estimator> getEstimators() {
-    return Arrays.asList(MAXIMUM_LIKELIHOOD_ESTIMATOR);
   }
 
   protected int computeToken(long hashValue) {
@@ -1123,8 +996,6 @@ public abstract class ExaLogLogTest {
   void testDistinctCountEqualOneMLEstimator() {
     testErrorOfDistinctCountEqualOne(
         new int[] {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18},
-        MAXIMUM_LIKELIHOOD_ESTIMATOR,
-        p -> PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), p),
         new double[] {
           0.0623, 0.0466, 0.0338, 0.0242, 0.0172, 0.0122, 0.0087, 0.0062, 0.0044, 0.0031, 0.0022,
           0.0016, 0.0011, 8.0E-4, 6.0E-4, 4.0E-4, 3.0E-4
@@ -1139,8 +1010,6 @@ public abstract class ExaLogLogTest {
   void testDistinctCountEqualTwoMLEstimator() {
     testErrorOfDistinctCountEqualTwo(
         new int[] {2, 3, 4, 5, 6, 7, 8, 9, 10},
-        MAXIMUM_LIKELIHOOD_ESTIMATOR,
-        p -> PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), p),
         new double[] {0.0614, 0.0463, 0.0337, 0.0242, 0.0172, 0.0122, 0.0087, 0.0062, 0.0044},
         new double[] {0.4974, 0.48, 0.4729, 0.4697, 0.4681, 0.4674, 0.467, 0.4668, 0.4667});
   }
@@ -1149,17 +1018,8 @@ public abstract class ExaLogLogTest {
   void testDistinctCountEqualThreeMLEstimator() {
     testErrorOfDistinctCountEqualThree(
         new int[] {2, 3, 4, 5, 6, 7},
-        MAXIMUM_LIKELIHOOD_ESTIMATOR,
-        p -> PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), p),
         new double[] {0.0606, 0.046, 0.0336, 0.0241, 0.0172, 0.0122},
         new double[] {0.5681, 0.5515, 0.5448, 0.5417, 0.5402, 0.5395});
-  }
-
-  @ParameterizedTest
-  @MethodSource("someExaLogLogConfigurations")
-  void testSomeBiasCorrectionConstants(int t, int d) {
-    assertThat(ExaLogLog.ML_BIAS_CORRECTION_CONSTANTS[t][d])
-        .isCloseTo(calculateBiasCorrectionConstant(t, d), withPercentage(1e-5));
   }
 
   @ParameterizedTest
@@ -1196,31 +1056,12 @@ public abstract class ExaLogLogTest {
     SplittableRandom random = new SplittableRandom(0xffc4b333c0c89271L);
     for (int p = getMinP(); p <= maxP; ++p) {
       testDistinctCountEstimation(
-          p,
-          random.nextLong(),
-          distinctCounts,
-          Arrays.asList(MAXIMUM_LIKELIHOOD_ESTIMATOR),
-          Arrays.asList(
-              pp -> PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), pp)),
-          new double[] {0.12},
-          new double[] {1.39},
-          new double[] {0.31},
-          0.1,
-          1.56,
-          0.28,
-          MAXIMUM_LIKELIHOOD_ESTIMATOR);
+          p, random.nextLong(), distinctCounts, 0.12, 1.39, 0.31, 0.1, 1.56, 0.28);
     }
   }
 
   @Test
   void testLargeDistinctCountEstimation() {
-    testLargeDistinctCountEstimation(
-        8,
-        0x746bb99d86c31b4dL,
-        1_000_000_000L,
-        Arrays.asList(MAXIMUM_LIKELIHOOD_ESTIMATOR),
-        Arrays.asList(p -> PrecomputedConstants.getTheoreticalRelativeErrorML(getT(), getD(), p)),
-        0.04,
-        0.025);
+    testLargeDistinctCountEstimation(8, 0x746bb99d86c31b4dL, 1_000_000_000L, 0.04, 0.025);
   }
 }

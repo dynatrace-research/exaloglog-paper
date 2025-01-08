@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -28,31 +28,26 @@ package com.dynatrace.exaloglogpaper;
 
 import static com.dynatrace.hash4j.util.Preconditions.checkArgument;
 
-import com.dynatrace.hash4j.distinctcount.HyperLogLog;
-import com.dynatrace.hash4j.distinctcount.StateChangeObserver;
-import com.dynatrace.hash4j.distinctcount.UltraLogLog;
-
 /**
- * A martingale estimator, that can be used in conjunction with a distinct counter such as {@link
- * HyperLogLog} or {@link UltraLogLog} to obtain slightly more accurate estimates for
- * non-distributed data streams than the corresponding standard estimators. For distributed data
- * streams, which require merging of partial results into a final result, the use of this martingale
- * estimator is not very useful and therefore not recommended.
+ * A martingale estimator, that can be used in conjunction with {@link ExaLogLog} to obtain slightly
+ * more accurate estimates for non-distributed data streams than the corresponding standard
+ * estimators. For distributed data streams, which require merging of partial results into a final
+ * result, the use of this martingale estimator is not very useful and therefore not recommended.
  *
  * <p>In order to get correct estimates, this estimator must be updated with every single add
- * operation of the corresponding distinct count data structure using {@link HyperLogLog#add(long,
- * StateChangeObserver)} and {@link UltraLogLog#add(long, StateChangeObserver)}, respectively.
+ * operation of the corresponding distinct count data structure using {@link ExaLogLog#add(long,
+ * MartingaleEstimator)}.
  *
  * <p>The estimator will become invalid, if the associated data structure is modified using
- * non-element addition operations such as {@link HyperLogLog#add(HyperLogLog)} or {@link
- * UltraLogLog#add(UltraLogLog)}. It is possible to initiate a new martingale estimator using the
- * values returned by {@code getStateChangeProbability()} and {@code getDistinctCountEstimate()} of
- * the corresponding distinct counter. At that point, the martingale estimator returns the same
- * estimate as the standard estimator. However, if many further elements are added, the martingale
- * estimator may again produce better estimates.
+ * non-element addition operations such as {@link ExaLogLog#add(ExaLogLog)}. It is possible to
+ * initiate a new martingale estimator using the values returned by {@code
+ * getStateChangeProbability()} and {@code getDistinctCountEstimate()} of the corresponding distinct
+ * counter. At that point, the martingale estimator returns the same estimate as the standard
+ * estimator. However, if many further elements are added, the martingale estimator may again
+ * produce better estimates.
  *
  * <p>The estimator remains valid if the associated data structure is downsized with {@link
- * HyperLogLog#downsize(int)} or {@link UltraLogLog#downsize(int)}.
+ * ExaLogLog#downsize(int, int)}.
  *
  * <p>References:
  *
@@ -67,7 +62,7 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
  *       estimation." arXiv preprint arXiv:2008.08739 (2020).
  * </ul>
  */
-public final class MartingaleEstimator implements StateChangeObserver {
+public final class MartingaleEstimator {
 
   private double distinctCountEstimate;
   private double stateChangeProbability;
@@ -129,13 +124,23 @@ public final class MartingaleEstimator implements StateChangeObserver {
     return distinctCountEstimate;
   }
 
-  // visible for testing
-  double getStateChangeProbability() {
+  /**
+   * Returns the state change probability
+   *
+   * @return the state change probability
+   */
+  public double getStateChangeProbability() {
     return stateChangeProbability;
   }
 
-  @Override
-  public void stateChanged(double probabilityDecrement) {
+  /**
+   * This method must be called whenever the internal state of the approximate distinct counter has
+   * changed. After a state change, the probability of a next state change is usually smaller. The
+   * positive decrement of this state change probability is passed as an argument.
+   *
+   * @param probabilityDecrement the positive probability decrement
+   */
+  public void decrementStateChangeProbability(double probabilityDecrement) {
     distinctCountEstimate += 1. / stateChangeProbability;
     stateChangeProbability -= probabilityDecrement;
     if (stateChangeProbability <= 0) { // numerical errors could lead to negative probability
@@ -153,5 +158,14 @@ public final class MartingaleEstimator implements StateChangeObserver {
         + ", stateChangeProbability="
         + stateChangeProbability
         + '}';
+  }
+
+  /**
+   * Creates a copy of this martingale estimator.
+   *
+   * @return a copy
+   */
+  public MartingaleEstimator copy() {
+    return new MartingaleEstimator(distinctCountEstimate, stateChangeProbability);
   }
 }

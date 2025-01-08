@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+# Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 #
 # This software and associated documentation files (the "Software")
 # are being made available by Dynatrace LLC for the sole purpose of
@@ -76,7 +76,7 @@ vals = [
 ]
 
 fig, axs = plt.subplots(3, 2, sharex=True)
-fig.set_size_inches(5, 5)
+fig.set_size_inches(5, 3.5)
 
 for v, row_idx, col_idx, ymax in vals:
 
@@ -92,7 +92,7 @@ for v, row_idx, col_idx, ymax in vals:
     ax.set_xlim([1, values["distinct count"][-1]])
     ax.set_xticks([pow(10.0, i) for i in range(0, 6)])
     if row_idx == 2:
-        ax.set_xlabel("distinct count")
+        ax.set_xlabel(r"distinct count $\symCardinality$")
     if col_idx == 0:
         ax.set_ylabel(r"relative error (\%)")
 
@@ -135,8 +135,7 @@ legend_order = [1, 0]
 fig.legend(
     [handles[i] for i in legend_order],
     [labels[i] for i in legend_order],
-    loc="lower center",
-    ncol=2,
+    ncol=1,
     columnspacing=1,
     labelspacing=0.2,
     # bbox_to_anchor=(0.52, 0.09),
@@ -144,9 +143,11 @@ fig.legend(
     handletextpad=0.4,
     fancybox=False,
     framealpha=1,
+    bbox_to_anchor=[0.9, 0.19],
+    loc="center",
 )
 fig.subplots_adjust(
-    top=0.985, bottom=0.15, left=0.095, right=0.98, wspace=0.23, hspace=0.1
+    top=0.985, bottom=0.12, left=0.095, right=0.98, wspace=0.23, hspace=0.11
 )
 
 fig.savefig(

@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -34,7 +34,6 @@ import com.dynatrace.hash4j.random.PseudoRandomGenerator;
 import com.dynatrace.hash4j.random.PseudoRandomGeneratorProvider;
 import java.util.Arrays;
 import java.util.SplittableRandom;
-import java.util.concurrent.atomic.AtomicLong;
 import org.assertj.core.data.Percentage;
 import org.hipparchus.analysis.UnivariateFunction;
 import org.hipparchus.analysis.solvers.BisectionSolver;
@@ -194,9 +193,9 @@ class DistinctCountUtilTest {
 
   @Test
   void testSolveMaximumLikelihoodEquationNumIterations() {
-    AtomicLong iterationCounter = new AtomicLong();
-    solveMaximumLikelihoodEquation(3.5, new int[] {1, 2, 3, 4, 5, 6}, 5, 0., iterationCounter);
-    assertThat(iterationCounter.get()).isEqualTo(4);
+    SolverStatistics solverStatistics = new SolverStatistics();
+    solveMaximumLikelihoodEquation(3.5, new int[] {1, 2, 3, 4, 5, 6}, 5, 0., solverStatistics);
+    assertThat(solverStatistics.iterationCounter).isEqualTo(4);
   }
 
   private static TokenIterable fromSortedArray(int[] tokens) {
@@ -232,7 +231,7 @@ class DistinctCountUtilTest {
       Arrays.sort(tokens);
 
       double estimate =
-          DistinctCountUtil.estimateDistinctCountFromTokens(
+          DistinctCountUtil.estimateDistinctCountFromSortedTokens(
               fromSortedArray(tokens), tokenParameter);
       assertThat(estimate).isCloseTo(distinctCount, Percentage.withPercentage(maxErrorInPercent));
     }
@@ -273,11 +272,9 @@ class DistinctCountUtilTest {
 
   @Test
   void testEstimationFromZeroTokens() {
-    for (int tokenParameter = TOKEN_PARAMETER_MIN;
-        tokenParameter <= TOKEN_PARAMETER_MAX;
-        ++tokenParameter) {
+    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
       double estimate =
-          DistinctCountUtil.estimateDistinctCountFromTokens(getTestTokens(0), tokenParameter);
+          DistinctCountUtil.estimateDistinctCountFromSortedTokens(getTestTokens(0), tokenParameter);
       assertThat(estimate).isZero();
     }
   }
@@ -288,11 +285,9 @@ class DistinctCountUtilTest {
 
   @Test
   void testEstimationFromAllTokens() {
-    for (int tokenParameter = TOKEN_PARAMETER_MIN;
-        tokenParameter <= TOKEN_PARAMETER_MAX;
-        ++tokenParameter) {
+    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
       double estimate =
-          DistinctCountUtil.estimateDistinctCountFromTokens(
+          DistinctCountUtil.estimateDistinctCountFromSortedTokens(
               getTestTokens(getMaxValidToken(tokenParameter) + 1), tokenParameter);
       assertThat(estimate).isInfinite();
     }
@@ -300,11 +295,9 @@ class DistinctCountUtilTest {
 
   @Test
   void testEstimationFromAlmostAllTokens() {
-    for (int tokenParameter = TOKEN_PARAMETER_MIN;
-        tokenParameter <= TOKEN_PARAMETER_MAX;
-        ++tokenParameter) {
+    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
       double estimate =
-          DistinctCountUtil.estimateDistinctCountFromTokens(
+          DistinctCountUtil.estimateDistinctCountFromSortedTokens(
               getTestTokens(getMaxValidToken(tokenParameter)), tokenParameter);
       assertThat(estimate).isFinite().isGreaterThan(1e19);
     }
@@ -317,9 +310,7 @@ class DistinctCountUtilTest {
 
     int numCycles = 100;
 
-    for (int tokenParameter = TOKEN_PARAMETER_MIN;
-        tokenParameter <= TOKEN_PARAMETER_MAX;
-        ++tokenParameter) {
+    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
 
       for (int nlz = 0; nlz <= 64 - tokenParameter; ++nlz) {
 

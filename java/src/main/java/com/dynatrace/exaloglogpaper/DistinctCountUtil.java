@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -27,8 +27,6 @@
 package com.dynatrace.exaloglogpaper;
 
 import static java.util.Objects.requireNonNull;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 class DistinctCountUtil {
 
@@ -61,8 +59,12 @@ class DistinctCountUtil {
     return solveMaximumLikelihoodEquation(a, b, n, relativeErrorLimit, null);
   }
 
+  static class SolverStatistics {
+    int iterationCounter;
+  }
+
   static double solveMaximumLikelihoodEquation(
-      double a, int[] b, int n, double relativeErrorLimit, AtomicLong iterationCounter) {
+      double a, int[] b, int n, double relativeErrorLimit, SolverStatistics solverStatistics) {
 
     long sigma0 = 0;
     double sigma1 = 0;
@@ -88,7 +90,7 @@ class DistinctCountUtil {
       x = Math.expm1(Math.log1p(x) * (sigma0 / sigma1));
 
       while (true) { // Newton iteration
-        if (iterationCounter != null) iterationCounter.incrementAndGet();
+        if (solverStatistics != null) solverStatistics.iterationCounter += 1;
         double lambda = 1;
         double eta = 0;
         double phi = b[uMax];
@@ -124,21 +126,20 @@ class DistinctCountUtil {
     return Math.log1p(x) * powUMax;
   }
 
-  static int computeToken(long hashValue, int tokenParameter) {
-    long mask = 0xFFFFFFFFFFFFFFFFL >>> -tokenParameter;
+  static int computeToken(long hashValue, int v) {
+    long mask = 0xFFFFFFFFFFFFFFFFL >>> -v;
     int idx = (int) (hashValue & mask);
     int nlz = Long.numberOfLeadingZeros(hashValue | mask);
     return (idx << 6) | nlz;
   }
 
-  static long reconstructHash(int token, int tokenParameter) {
-    @SuppressWarnings("IntLongMath")
+  static long reconstructHash(int token, int v) {
     long idx = token >>> 6;
-    return ((0xFFFFFFFFFFFFFFFFL >>> tokenParameter >>> token) << tokenParameter) | idx;
+    return ((0xFFFFFFFFFFFFFFFFL >>> v >>> token) << v) | idx;
   }
 
-  static final int TOKEN_PARAMETER_MAX = 26;
-  static final int TOKEN_PARAMETER_MIN = 1;
+  static final int V_MAX = 26; // 32 - 6
+  static final int V_MIN = 1;
 
   /**
    * An iterable over hash tokens.
@@ -203,17 +204,18 @@ class DistinctCountUtil {
   private static final int INVALID_TOKEN_INDEX = 0xFFFFFFFF;
 
   /**
-   * Estimates the distinct count from a list of tokens.
+   * Estimates the distinct count from a sorted list of tokens.
    *
-   * @param tokenIterable a iterable for tokens
+   * @param tokenIterable an iterable over the sorted list of tokens
    * @return the estimated distinct count
    */
-  static double estimateDistinctCountFromTokens(TokenIterable tokenIterable, int tokenParameter) {
-    return estimateDistinctCountFromTokens(tokenIterable, tokenParameter, null);
+  static double estimateDistinctCountFromSortedTokens(
+      TokenIterable tokenIterable, int tokenParameter) {
+    return estimateDistinctCountFromSortedTokens(tokenIterable, tokenParameter, null);
   }
 
-  static double estimateDistinctCountFromTokens(
-      TokenIterable tokenIterable, int tokenParameter, AtomicLong iterationCounter) {
+  static double estimateDistinctCountFromSortedTokens(
+      TokenIterable tokenIterable, int tokenParameter, SolverStatistics solverStatistics) {
     requireNonNull(tokenIterable);
 
     TokenIterator tokenIterator = tokenIterable.iterator();
@@ -254,7 +256,7 @@ class DistinctCountUtil {
             b,
             maxNonZeroIndex,
             0.,
-            iterationCounter)
+            solverStatistics)
         * pow2(tokenParameter + 1);
   }
 

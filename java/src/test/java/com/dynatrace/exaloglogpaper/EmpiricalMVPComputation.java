@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2024 Dynatrace LLC. All rights reserved.
+// Copyright (c) 2024-2025 Dynatrace LLC. All rights reserved.
 //
 // This software and associated documentation files (the "Software")
 // are being made available by Dynatrace LLC for the sole purpose of
@@ -28,14 +28,10 @@ package com.dynatrace.exaloglogpaper;
 
 import com.dynatrace.hash4j.distinctcount.HyperLogLog;
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.stream.IntStream;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.datasketches.hll.HllSketch;
@@ -94,7 +90,7 @@ public class EmpiricalMVPComputation {
 
     @Override
     public double getEstimate(ExaLogLog sketch) {
-      return sketch.getDistinctCountEstimate(ExaLogLog.MAXIMUM_LIKELIHOOD_ESTIMATOR);
+      return sketch.getDistinctCountEstimate();
     }
   }
 
@@ -198,7 +194,9 @@ public class EmpiricalMVPComputation {
     public double getEstimate(CpcSketch sketch) {
       CpcUnion union = new CpcUnion(p);
       union.update(sketch);
-      return union.getResult().getEstimate(); // hack to ensure that hip estimator is not used
+      return union
+          .getResult()
+          .getEstimate(); // hack to ensure that martingale estimator is not used
     }
   }
 
@@ -291,32 +289,21 @@ public class EmpiricalMVPComputation {
     }
   }
 
-  private static long[] getDistinctCounts(long max, double relativeStep) {
-    List<Long> result = new ArrayList<>();
-    while (max > 0) {
-      result.add(max);
-      max = Math.min(max - 1, (long) Math.ceil(max / (1 + relativeStep)));
-    }
-    Collections.reverse(result);
-    return result.stream().mapToLong(i -> i).toArray();
-  }
-
   private static final class Statistics {
+
+    private long count = 0;
 
     private final long trueDistinctCount;
 
-    private long sumInMemorySizeInBytes = 0;
-
     private long minimumInMemorySizeInBytes = Long.MAX_VALUE;
-
+    private long sumInMemorySizeInBytes = 0;
+    private long sumInMemorySizeInBytesSquared = 0;
     private long maximumInMemorySizeInBytes = Long.MIN_VALUE;
-    private long sumSerializationSizeInBytes = 0;
 
     private long minimumSerializationSizeInBytes = Long.MAX_VALUE;
-
+    private long sumSerializationSizeInBytes = 0;
+    private long sumSerializationSizeInBytesSquared = 0;
     private long maximumSerializationSizeInBytes = Long.MIN_VALUE;
-
-    private long count = 0;
 
     private double sumDistinctCountEstimationError = 0;
 
@@ -326,29 +313,49 @@ public class EmpiricalMVPComputation {
       this.trueDistinctCount = trueDistinctCount;
     }
 
-    public void add(
+    public synchronized void add(
         long inMemorySizeInBytes, long serializedSizeInBytes, double distinctCountEstimate) {
       count += 1;
       minimumInMemorySizeInBytes = Math.min(minimumInMemorySizeInBytes, inMemorySizeInBytes);
       maximumInMemorySizeInBytes = Math.max(maximumInMemorySizeInBytes, inMemorySizeInBytes);
       sumInMemorySizeInBytes += inMemorySizeInBytes;
+      sumInMemorySizeInBytesSquared += inMemorySizeInBytes * inMemorySizeInBytes;
+
       minimumSerializationSizeInBytes =
           Math.min(minimumSerializationSizeInBytes, serializedSizeInBytes);
       maximumSerializationSizeInBytes =
           Math.max(maximumSerializationSizeInBytes, serializedSizeInBytes);
       sumSerializationSizeInBytes += serializedSizeInBytes;
+      sumSerializationSizeInBytesSquared += serializedSizeInBytes * serializedSizeInBytes;
+
       double distinctCountEstimationError = distinctCountEstimate - trueDistinctCount;
       sumDistinctCountEstimationError += distinctCountEstimationError;
       sumDistinctCountEstimationErrorSquared +=
           distinctCountEstimationError * distinctCountEstimationError;
     }
 
-    public double getAverageSerializationSizeInBytes() {
-      return sumSerializationSizeInBytes / (double) count;
+    public long getMinimumInMemorySizeInBytes() {
+      return minimumInMemorySizeInBytes;
+    }
+
+    public long getMaximumInMemorySizeInBytes() {
+      return maximumInMemorySizeInBytes;
     }
 
     public double getAverageInMemorySizeInBytes() {
       return sumInMemorySizeInBytes / (double) count;
+    }
+
+    public long getMinimumSerializationSizeInBytes() {
+      return minimumSerializationSizeInBytes;
+    }
+
+    public long getMaximumSerializationSizeInBytes() {
+      return maximumSerializationSizeInBytes;
+    }
+
+    public double getAverageSerializationSizeInBytes() {
+      return sumSerializationSizeInBytes / (double) count;
     }
 
     public double getRelativeEstimationBias() {
@@ -363,71 +370,85 @@ public class EmpiricalMVPComputation {
       return trueDistinctCount;
     }
 
-    public long getMinimumInMemorySizeInBytes() {
-      return minimumInMemorySizeInBytes;
-    }
-
-    public long getMaximumInMemorySizeInBytes() {
-      return maximumInMemorySizeInBytes;
-    }
-
-    public long getMinimumSerializationSizeInBytes() {
-      return minimumSerializationSizeInBytes;
-    }
-
-    public long getMaximumSerializationSizeInBytes() {
-      return maximumSerializationSizeInBytes;
-    }
-
-    double getEstimatedInMemoryMVP() {
+    public double getEstimatedInMemoryMVP() {
       return getAverageInMemorySizeInBytes()
           * 8.
           * sumDistinctCountEstimationErrorSquared
           / ((double) count * trueDistinctCount * trueDistinctCount);
     }
 
-    double getEstimatedSerializationMVP() {
+    public double getEstimatedSerializationMVP() {
       return getAverageSerializationSizeInBytes()
           * 8.
           * sumDistinctCountEstimationErrorSquared
           / ((double) count * trueDistinctCount * trueDistinctCount);
     }
+
+    public double getStandardDeviationInMemorySizeInBytes() {
+      return Math.sqrt(
+              count * sumInMemorySizeInBytesSquared
+                  - sumInMemorySizeInBytes * sumInMemorySizeInBytes)
+          / count;
+    }
+
+    public double getStandardDeviationSerializationSizeInBytes() {
+      return Math.sqrt(
+              count * sumSerializationSizeInBytesSquared
+                  - sumSerializationSizeInBytes * sumSerializationSizeInBytes)
+          / count;
+    }
   }
 
   private static <T> void test(Config<T> config) {
-    int numCycles = 100000;
+    int numCycles = 1_000_000;
     List<Statistics> statistics =
         Arrays.asList(
             new Statistics(1),
+            new Statistics(2),
+            new Statistics(5),
             new Statistics(10),
+            new Statistics(20),
+            new Statistics(50),
             new Statistics(100),
+            new Statistics(200),
+            new Statistics(500),
             new Statistics(1000),
+            new Statistics(2000),
+            new Statistics(5000),
             new Statistics(10_000),
+            new Statistics(20_000),
+            new Statistics(50_000),
             new Statistics(100_000),
+            new Statistics(200_000),
+            new Statistics(500_000),
             new Statistics(1_000_000));
 
-    SplittableRandom rng = new SplittableRandom(0);
+    SplittableRandom seedRandom = new SplittableRandom(0);
+    long[] seeds = seedRandom.longs(numCycles).toArray();
 
-    for (int i = 0; i < numCycles; ++i) {
-      T sketch = config.create();
-
-      int distinctCountsIdx = 0;
-      long distinctCount = 0;
-      while (true) {
-        if (distinctCount == statistics.get(distinctCountsIdx).trueDistinctCount) {
-          statistics
-              .get(distinctCountsIdx)
-              .add(
-                  config.getInMemorySizeInBytes(sketch),
-                  config.getSerializedSizeInBytes(sketch),
-                  config.getEstimate(sketch));
-          distinctCountsIdx += 1;
-          if (distinctCountsIdx == statistics.size()) break;
-        }
-        config.add(sketch, rng.nextLong());
-        distinctCount += 1;
-      }
-    }
+    IntStream.range(0, numCycles)
+        .parallel()
+        .forEach(
+            i -> {
+              T sketch = config.create();
+              SplittableRandom rng = new SplittableRandom(seeds[i]);
+              int distinctCountsIdx = 0;
+              long distinctCount = 0;
+              while (true) {
+                if (distinctCount == statistics.get(distinctCountsIdx).trueDistinctCount) {
+                  statistics
+                      .get(distinctCountsIdx)
+                      .add(
+                          config.getInMemorySizeInBytes(sketch),
+                          config.getSerializedSizeInBytes(sketch),
+                          config.getEstimate(sketch));
+                  distinctCountsIdx += 1;
+                  if (distinctCountsIdx == statistics.size()) break;
+                }
+                config.add(sketch, rng.nextLong());
+                distinctCount += 1;
+              }
+            });
 
     try (FileWriter o =
         new FileWriter(
@@ -439,11 +460,16 @@ public class EmpiricalMVPComputation {
       o.write("; minimum memory size");
       o.write("; average memory size");
       o.write("; maximum memory size");
+      o.write("; standard deviation memory size");
+
       o.write("; minimum serialization size");
       o.write("; average serialization size");
       o.write("; maximum serialization size");
+      o.write("; standard deviation serialization size");
+
       o.write("; relative distinct count estimation bias");
       o.write("; relative distinct count estimation rmse");
+
       o.write("; estimated memory MVP");
       o.write("; estimated serialization MVP");
 
@@ -453,11 +479,16 @@ public class EmpiricalMVPComputation {
         o.write("; " + s.getMinimumInMemorySizeInBytes());
         o.write("; " + s.getAverageInMemorySizeInBytes());
         o.write("; " + s.getMaximumInMemorySizeInBytes());
+        o.write("; " + s.getStandardDeviationInMemorySizeInBytes());
+
         o.write("; " + s.getMinimumSerializationSizeInBytes());
         o.write("; " + s.getAverageSerializationSizeInBytes());
         o.write("; " + s.getMaximumSerializationSizeInBytes());
+        o.write("; " + s.getStandardDeviationSerializationSizeInBytes());
+
         o.write("; " + s.getRelativeEstimationBias());
         o.write("; " + s.getRelativeEstimationRmse());
+
         o.write("; " + s.getEstimatedInMemoryMVP());
         o.write("; " + s.getEstimatedSerializationMVP());
         o.write('\n');
@@ -468,34 +499,13 @@ public class EmpiricalMVPComputation {
   }
 
   public static void main(String[] args) {
-    ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
-
-    List<Future<?>> futures = new ArrayList<>();
-
-    futures.add(executor.submit(() -> test(new Hash4jHyperLogLogConfig(11))));
-    futures.add(executor.submit(() -> test(new Hash4jUltraLogLogConfig(10))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesCPCConfig(10))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL4Config(11))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL6Config(11))));
-    futures.add(executor.submit(() -> test(new ApacheDataSketchesHLL8Config(11))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 0, 11))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 1, 10))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(0, 2, 10))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(1, 9, 9))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 16, 8))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 20, 8))));
-    futures.add(executor.submit(() -> test(new ExaLogLogConfig(2, 24, 8))));
-
-    for (var f : futures) {
-      try {
-        f.get();
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      } catch (ExecutionException e) {
-        throw new RuntimeException(e);
-      }
-    }
-
-    executor.shutdown();
+    test(new Hash4jHyperLogLogConfig(11));
+    test(new Hash4jUltraLogLogConfig(10));
+    test(new ApacheDataSketchesCPCConfig(10));
+    test(new ApacheDataSketchesHLL4Config(11));
+    test(new ApacheDataSketchesHLL6Config(11));
+    test(new ApacheDataSketchesHLL8Config(11));
+    test(new ExaLogLogConfig(2, 20, 8));
+    test(new ExaLogLogConfig(2, 24, 8));
   }
 }
