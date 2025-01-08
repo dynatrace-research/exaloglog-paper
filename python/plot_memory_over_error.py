@@ -56,7 +56,7 @@ def plot_error_over_memory():
 
     ax.set_xlim([min_error, max_error])
     ax.set_yscale("log", base=2)
-    ax.set_xlabel(r"relative error (\%)")
+    ax.set_xlabel(r"relative standard error (\%)")
     ax.set_ylabel(r"memory (bytes)")
     ax.grid(visible=True)
     ax.set_yticks([2**i for i in range(7, 14)], labels=[2**i for i in range(7, 14)])

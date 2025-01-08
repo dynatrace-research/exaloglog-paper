@@ -18,7 +18,7 @@ This work introduces ExaLogLog, a new data structure for approximate distinct co
    sudo apt update && sudo apt --yes install openjdk-21-jdk python-is-python3 python3-pip texlive texlive-latex-extra texlive-fonts-extra texlive-science && pip install -r python/requirements.txt --break-system-packages
    ```
 
-4. To reproduce the estimation error results `results/error/*.csv` run the `simulateEstimationErrors` task (takes ~30min):
+4. To reproduce the estimation error results `results/error/*.csv` run the `simulateEstimationErrors` task (takes ~35min):
    ```
    ./gradlew simulateEstimationErrors
    ```
@@ -34,12 +34,12 @@ This work introduces ExaLogLog, a new data structure for approximate distinct co
    sudo sh -c "echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo"; ./gradlew runBenchmarks; sudo sh -c "echo 0 > /sys/devices/system/cpu/intel_pstate/no_turbo"
    ```
 
-7. To calculate theoretical MVP constants as well as constants used in the Java implementation run the `calculateConstants` task (takes ~10min, not needed for the figures):
+7. To calculate theoretical MVP constants as well as constants used in the Java implementation run the `calculateConstants` task (takes ~9min, not needed for the figures):
    ```
    ./gradlew calculateConstants
    ```
    The output can then be found in the `results/constants` folder.
-8. To (re-)generate all figures in the `paper` directory execute the `pdfFigures` task (takes ~30s):
+8. To (re-)generate all figures in the `paper` directory execute the `pdfFigures` task (takes ~1m30s):
    ```
    ./gradlew pdfFigures
    ```
