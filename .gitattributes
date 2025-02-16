@@ -1,8 +1,9 @@
 * text=auto
 *.java text eol=lf
+*.cpp text eol=lf
 *.py text eol=lf
 *.md text eol=lf
-*.csv text
+*.csv text eol=lf
 gradlew.bat text eol=crlf
 gradlew text eol=lf
 *.gradle eol=lf

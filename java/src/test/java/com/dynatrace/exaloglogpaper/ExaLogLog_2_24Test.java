@@ -33,7 +33,7 @@ import com.dynatrace.hash4j.hashing.Hashing;
 import java.util.SplittableRandom;
 import org.junit.jupiter.api.Test;
 
-public class ExaLogLog_2_24Test extends ExaLogLogTest {
+public class ExaLogLog_2_24Test extends AbstractSpecificExaLogLogTest {
 
   private static final int T = 2;
   private static final int D = 24;

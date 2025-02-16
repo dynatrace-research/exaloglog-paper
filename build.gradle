@@ -150,7 +150,7 @@ def memoryFigFiles = ["paper/memory.pdf"]
 task makeMemoryChart (type: Exec) {
 	inputs.files "python/preamble.py", "python/memory_chart.py","paper/symbols.tex"
 	inputs.dir "results/comparison-empirical-mvp"
-	outputs.files benchmarksFigFiles
+	outputs.files memoryFigFiles
 	commandLine 'python', "python/memory_chart.py"
 }
 figFiles +=memoryFigFiles

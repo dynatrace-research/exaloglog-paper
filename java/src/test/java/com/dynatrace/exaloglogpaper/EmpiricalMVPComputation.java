@@ -289,9 +289,35 @@ public class EmpiricalMVPComputation {
     }
   }
 
+  private static final class StatisticsBuilder {
+    private final int numCycles;
+    private final long trueDistinctCount;
+    private final long[] inMemorySizeInBytesValues;
+    private final long[] serializedSizeInBytesValues;
+    private final double[] distinctCountEstimateValues;
+
+    private StatisticsBuilder(int numCycles, long trueDistinctCount) {
+      this.numCycles = numCycles;
+      this.trueDistinctCount = trueDistinctCount;
+      this.inMemorySizeInBytesValues = new long[numCycles];
+      this.serializedSizeInBytesValues = new long[numCycles];
+      this.distinctCountEstimateValues = new double[numCycles];
+    }
+
+    public void add(
+        int cycleIndex,
+        long inMemorySizeInBytes,
+        long serializationSizeInBytes,
+        double distinctCountEstimate) {
+      inMemorySizeInBytesValues[cycleIndex] = inMemorySizeInBytes;
+      serializedSizeInBytesValues[cycleIndex] = serializationSizeInBytes;
+      distinctCountEstimateValues[cycleIndex] = distinctCountEstimate;
+    }
+  }
+
   private static final class Statistics {
 
-    private long count = 0;
+    private final long count;
 
     private final long trueDistinctCount;
 
@@ -309,29 +335,31 @@ public class EmpiricalMVPComputation {
 
     private double sumDistinctCountEstimationErrorSquared = 0;
 
-    private Statistics(long trueDistinctCount) {
-      this.trueDistinctCount = trueDistinctCount;
-    }
+    private Statistics(StatisticsBuilder statisticsBuilder) {
+      trueDistinctCount = statisticsBuilder.trueDistinctCount;
+      count = statisticsBuilder.numCycles;
+      for (int i = 0; i < statisticsBuilder.numCycles; ++i) {
+        long inMemorySizeInBytes = statisticsBuilder.inMemorySizeInBytesValues[i];
+        long serializationSizeInBytes = statisticsBuilder.serializedSizeInBytesValues[i];
+        double distinctCountEstimate = statisticsBuilder.distinctCountEstimateValues[i];
 
-    public synchronized void add(
-        long inMemorySizeInBytes, long serializedSizeInBytes, double distinctCountEstimate) {
-      count += 1;
-      minimumInMemorySizeInBytes = Math.min(minimumInMemorySizeInBytes, inMemorySizeInBytes);
-      maximumInMemorySizeInBytes = Math.max(maximumInMemorySizeInBytes, inMemorySizeInBytes);
-      sumInMemorySizeInBytes += inMemorySizeInBytes;
-      sumInMemorySizeInBytesSquared += inMemorySizeInBytes * inMemorySizeInBytes;
+        minimumInMemorySizeInBytes = Math.min(minimumInMemorySizeInBytes, inMemorySizeInBytes);
+        maximumInMemorySizeInBytes = Math.max(maximumInMemorySizeInBytes, inMemorySizeInBytes);
+        sumInMemorySizeInBytes += inMemorySizeInBytes;
+        sumInMemorySizeInBytesSquared += inMemorySizeInBytes * inMemorySizeInBytes;
 
-      minimumSerializationSizeInBytes =
-          Math.min(minimumSerializationSizeInBytes, serializedSizeInBytes);
-      maximumSerializationSizeInBytes =
-          Math.max(maximumSerializationSizeInBytes, serializedSizeInBytes);
-      sumSerializationSizeInBytes += serializedSizeInBytes;
-      sumSerializationSizeInBytesSquared += serializedSizeInBytes * serializedSizeInBytes;
+        minimumSerializationSizeInBytes =
+            Math.min(minimumSerializationSizeInBytes, serializationSizeInBytes);
+        maximumSerializationSizeInBytes =
+            Math.max(maximumSerializationSizeInBytes, serializationSizeInBytes);
+        sumSerializationSizeInBytes += serializationSizeInBytes;
+        sumSerializationSizeInBytesSquared += serializationSizeInBytes * serializationSizeInBytes;
 
-      double distinctCountEstimationError = distinctCountEstimate - trueDistinctCount;
-      sumDistinctCountEstimationError += distinctCountEstimationError;
-      sumDistinctCountEstimationErrorSquared +=
-          distinctCountEstimationError * distinctCountEstimationError;
+        double distinctCountEstimationError = distinctCountEstimate - trueDistinctCount;
+        sumDistinctCountEstimationError += distinctCountEstimationError;
+        sumDistinctCountEstimationErrorSquared +=
+            distinctCountEstimationError * distinctCountEstimationError;
+      }
     }
 
     public long getMinimumInMemorySizeInBytes() {
@@ -401,27 +429,27 @@ public class EmpiricalMVPComputation {
 
   private static <T> void test(Config<T> config) {
     int numCycles = 1_000_000;
-    List<Statistics> statistics =
+    List<StatisticsBuilder> statisticBuilders =
         Arrays.asList(
-            new Statistics(1),
-            new Statistics(2),
-            new Statistics(5),
-            new Statistics(10),
-            new Statistics(20),
-            new Statistics(50),
-            new Statistics(100),
-            new Statistics(200),
-            new Statistics(500),
-            new Statistics(1000),
-            new Statistics(2000),
-            new Statistics(5000),
-            new Statistics(10_000),
-            new Statistics(20_000),
-            new Statistics(50_000),
-            new Statistics(100_000),
-            new Statistics(200_000),
-            new Statistics(500_000),
-            new Statistics(1_000_000));
+            new StatisticsBuilder(numCycles, 1),
+            new StatisticsBuilder(numCycles, 2),
+            new StatisticsBuilder(numCycles, 5),
+            new StatisticsBuilder(numCycles, 10),
+            new StatisticsBuilder(numCycles, 20),
+            new StatisticsBuilder(numCycles, 50),
+            new StatisticsBuilder(numCycles, 100),
+            new StatisticsBuilder(numCycles, 200),
+            new StatisticsBuilder(numCycles, 500),
+            new StatisticsBuilder(numCycles, 1000),
+            new StatisticsBuilder(numCycles, 2000),
+            new StatisticsBuilder(numCycles, 5000),
+            new StatisticsBuilder(numCycles, 10_000),
+            new StatisticsBuilder(numCycles, 20_000),
+            new StatisticsBuilder(numCycles, 50_000),
+            new StatisticsBuilder(numCycles, 100_000),
+            new StatisticsBuilder(numCycles, 200_000),
+            new StatisticsBuilder(numCycles, 500_000),
+            new StatisticsBuilder(numCycles, 1_000_000));
 
     SplittableRandom seedRandom = new SplittableRandom(0);
     long[] seeds = seedRandom.longs(numCycles).toArray();
@@ -429,26 +457,29 @@ public class EmpiricalMVPComputation {
     IntStream.range(0, numCycles)
         .parallel()
         .forEach(
-            i -> {
+            cycleIndex -> {
               T sketch = config.create();
-              SplittableRandom rng = new SplittableRandom(seeds[i]);
+              SplittableRandom rng = new SplittableRandom(seeds[cycleIndex]);
               int distinctCountsIdx = 0;
               long distinctCount = 0;
               while (true) {
-                if (distinctCount == statistics.get(distinctCountsIdx).trueDistinctCount) {
-                  statistics
+                if (distinctCount == statisticBuilders.get(distinctCountsIdx).trueDistinctCount) {
+                  statisticBuilders
                       .get(distinctCountsIdx)
                       .add(
+                          cycleIndex,
                           config.getInMemorySizeInBytes(sketch),
                           config.getSerializedSizeInBytes(sketch),
                           config.getEstimate(sketch));
                   distinctCountsIdx += 1;
-                  if (distinctCountsIdx == statistics.size()) break;
+                  if (distinctCountsIdx == statisticBuilders.size()) break;
                 }
                 config.add(sketch, rng.nextLong());
                 distinctCount += 1;
               }
             });
+
+    List<Statistics> statistics = statisticBuilders.stream().map(Statistics::new).toList();
 
     try (FileWriter o =
         new FileWriter(

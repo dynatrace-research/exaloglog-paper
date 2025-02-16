@@ -177,6 +177,8 @@ public final class TestUtils {
       if (random < probabilityLow) return true;
       if (random >= probabilityHigh) return false;
       probability -= probabilityLow;
+      long probabilityDiff = probabilityHigh - probabilityLow;
+      if (probabilityDiff > 1) probability /= probabilityDiff;
     }
   }
 

@@ -40,6 +40,14 @@ public:
 	HyperLogLogLogConfig(uint8_t p) : p(p) {
 	}
 
+	hyperlogloglog::HyperLogLogLog<uint64_t>* createNew() const {
+		return new hyperlogloglog::HyperLogLogLog<uint64_t>(1 << p, 3,
+				hyperlogloglog::HyperLogLogLog < uint64_t
+						> ::HYPERLOGLOGLOG_COMPRESS_WHEN_APPEND
+						| hyperlogloglog::HyperLogLogLog < uint64_t
+								> ::HYPERLOGLOGLOG_COMPRESS_TYPE_INCREASE);
+	}
+
 	hyperlogloglog::HyperLogLogLog<uint64_t> create() const {
 		return hyperlogloglog::HyperLogLogLog < uint64_t
 				> (1 << p, 3, hyperlogloglog::HyperLogLogLog < uint64_t

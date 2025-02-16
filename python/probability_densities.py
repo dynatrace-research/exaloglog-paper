@@ -37,7 +37,7 @@ def pdf_exaloglog(t, k):
 
 
 fig, ax = plt.subplots(1, 2)
-fig.set_size_inches(6, 1.8)
+fig.set_size_inches(6, 2)
 
 
 def plot_x(ax, t):
@@ -66,6 +66,7 @@ def plot_x(ax, t):
     )
     ax.legend(
         loc="upper right",
+        bbox_to_anchor=(1.01, 1.02),
         columnspacing=1,
         labelspacing=0.2,
         borderpad=0.2,
@@ -73,7 +74,7 @@ def plot_x(ax, t):
         fancybox=False,
         framealpha=1,
     )
-    ax.set_ylabel("probability")
+    ax.set_xlabel(r"\symUpdateVal")
     ax.set_yscale("log", base=2)
     ax.set_yscale("log", base=2)
 
@@ -81,7 +82,11 @@ def plot_x(ax, t):
 plot_x(ax[0], t=1)
 plot_x(ax[1], t=2)
 
-fig.subplots_adjust(left=0.09, bottom=0.112, right=0.992, top=0.985, wspace=0.3)
+ax[0].set_ylabel("probability")
+ax[0].set_yticks([2 ** (-i) for i in range(2, 14, 2)])
+ax[1].set_yticks([2 ** (-i) for i in range(3, 9, 1)])
+
+fig.subplots_adjust(left=0.087, bottom=0.20, right=0.992, top=0.985, wspace=0.15)
 fig.savefig(
     "paper/probability_densities.pdf",
     format="pdf",

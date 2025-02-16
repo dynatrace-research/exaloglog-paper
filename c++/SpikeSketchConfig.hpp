@@ -44,7 +44,7 @@ class SpikeSketchConfig {
 	static constexpr int ncode = 4; //Number of bits in a single cell
 	static constexpr int p = 12;
 
-	uint32_t numOfBuckets;
+	const uint32_t numOfBuckets;
 
 	static constexpr uint32_t seed = 0x529b9601;
 
@@ -54,6 +54,15 @@ public:
 
 	SpikeSketchConfig(uint32_t numOfBuckets) : numOfBuckets(numOfBuckets) {
 
+	}
+
+	vector<spike_sketch>* createNew() const {
+		vector < spike_sketch > *spikeSketchArray = new vector<spike_sketch>();
+		spikeSketchArray->reserve(numOfBuckets);
+		for (uint32_t bktIdx = 0; bktIdx < numOfBuckets; bktIdx++) {
+			spikeSketchArray->emplace_back(n, p, ncode, seed);
+		}
+		return spikeSketchArray;
 	}
 
 	vector<spike_sketch> create() const {
@@ -68,14 +77,14 @@ public:
 	void add(vector<spike_sketch> &sketch, uint64_t hash) const {
 		uint32_t tempInt32 = 0;
 		MurmurHash3_x86_32(&hash, 8, seed + 231321, &tempInt32);
-		spike_sketch ss = sketch[tempInt32 % numOfBuckets];
+		spike_sketch &ss = sketch[tempInt32 % numOfBuckets];
 		ss.update(hash);
 	}
 
 	void add(vector<spike_sketch> &sketch, const vector<uint8_t> &data) const {
 		uint64_t hash[2];
 		MurmurHash3_x86_128(&data[0], data.size(), UINT32_C(0x6e0a09bd), &hash);
-		spike_sketch ss = sketch[hash[1] % numOfBuckets];
+		spike_sketch &ss = sketch[hash[1] % numOfBuckets];
 		ss.update(hash[0]);
 	}
 

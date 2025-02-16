@@ -315,6 +315,7 @@ public class ExaLogLog {
     return r;
   }
 
+  // see Algorithm 5 in paper
   private static long mergeRegister(long r1, long r2, int d) {
     long u1 = r1 >>> d;
     long u2 = r2 >>> d;
@@ -548,6 +549,8 @@ public class ExaLogLog {
   }
 
   // computation of ML equation coefficients
+  // this is an optimized version of Algorithm 3 as described in the paper
+  // see unit test, which tests this function against the reference
   static long contribute(long r, int[] b, int t, int d, int p) {
     int u = (int) (r >>> d);
     if (u == 0) return 1L << -p;

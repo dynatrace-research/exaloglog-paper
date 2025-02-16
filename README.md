@@ -1,6 +1,6 @@
 # ExaLogLog: Space-Efficient and Practical Approximate Distinct Counting up to the Exa-Scale
 
-This repository contains the source code to reproduce the results and figures presented in the paper "ExaLogLog: Space-Efficient and Practical Approximate Distinct Counting up to the Exa-Scale".
+This repository contains the source code to reproduce the results and figures presented in the paper "ExaLogLog: Space-Efficient and Practical Approximate Distinct Counting up to the Exa-Scale" which was accepted at [EDBT 2025](https://edbticdt2025.upc.edu/).
 
 ## Abstract
 This work introduces ExaLogLog, a new data structure for approximate distinct counting, which has the same practical properties as the popular HyperLogLog algorithm. It is commutative, idempotent, mergeable, reducible, has a constant-time insert operation, and supports distinct counts up to the exa-scale. At the same time, as theoretically derived and experimentally verified, it requires 43% less space to achieve the same estimation error.
@@ -15,21 +15,21 @@ This work introduces ExaLogLog, a new data structure for approximate distinct co
 
 3. Install all required packages:
    ```
-   sudo apt update && sudo apt --yes install openjdk-21-jdk python-is-python3 python3-pip texlive texlive-latex-extra texlive-fonts-extra texlive-science && pip install -r python/requirements.txt --break-system-packages
+   sudo apt update && sudo apt --yes install openjdk-21-jdk python-is-python3 python3-pip texlive texlive-latex-extra texlive-fonts-extra texlive-science black && pip install -r python/requirements.txt --break-system-packages
    ```
 
-4. To reproduce the estimation error results `results/error/*.csv` run the `simulateEstimationErrors` task (takes ~35min):
+4. To reproduce the estimation error results in the folder `results/error` run the `simulateEstimationErrors` task (takes ~35min):
    ```
    ./gradlew simulateEstimationErrors
    ```
 
-5. To reproduce the empirically determined memory-variance product (MVP) values based on the actual allocated memory and the serialization size of different data structure implementations for approximate distinct counting run the `runEmpiricalMVPComputation` task (takes ~1h10min):
+5. To reproduce the empirically determined memory-variance product (MVP) values based on the actual allocated memory and the serialization size of different data structure implementations for approximate distinct counting run the `runEmpiricalMVPComputation` task (takes ~1h):
    ```
    ./gradlew runEmpiricalMVPComputation
    ```
-   The results can be found in the `results\comparison-empirical-mvp` folder.
+   The results can be found in the `results/comparison-empirical-mvp` folder.
 
-6. To reproduce the performance benchmark results in the folder `results/benchmarks` disable Turbo Boost ([set P-state to 1](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/processor_state_control.html)), run the `runBenchmarks` task (takes ~8h15min), and enable Turbo Boost again:
+6. To reproduce the performance benchmark results in the folder `results/benchmarks` disable Turbo Boost ([set P-state to 1](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/processor_state_control.html)), run the `runBenchmarks` task (takes ~8h), and enable Turbo Boost again:
    ```
    sudo sh -c "echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo"; ./gradlew runBenchmarks; sudo sh -c "echo 0 > /sys/devices/system/cpu/intel_pstate/no_turbo"
    ```
@@ -39,7 +39,7 @@ This work introduces ExaLogLog, a new data structure for approximate distinct co
    ./gradlew calculateConstants
    ```
    The output can then be found in the `results/constants` folder.
-8. To (re-)generate all figures in the `paper` directory execute the `pdfFigures` task (takes ~1m30s):
+8. To (re-)generate all figures in the `paper` directory execute the `pdfFigures` task (takes ~90s):
    ```
    ./gradlew pdfFigures
    ```
