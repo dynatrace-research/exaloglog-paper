@@ -47,6 +47,10 @@ class DistinctCountUtil {
    * or {@code n >= 64} the behavior of this function is not defined. {@code a} must be either zero
    * or greater than or equal to 2^{-64}.
    *
+   * <p>This algorithm corresponds to Algorithm 8 in the paper, but allows to define an additional
+   * stop criterion by defining a relative error limit. It can be disabled by setting it to 0 as
+   * done in all our simulations in the paper.
+   *
    * @param a parameter a
    * @param b parameter b
    * @param n parameter n
@@ -83,8 +87,8 @@ class DistinctCountUtil {
 
     final double powUMax = pow2(uMax);
     sigma1 *= powUMax;
-    final double aPow = a * powUMax;
-    double x = sigma1 / aPow;
+    final double aPowUMax = a * powUMax;
+    double x = sigma1 / aPowUMax;
 
     if (uMin < uMax) {
       x = Math.expm1(Math.log1p(x) * (sigma0 / sigma1));
@@ -93,11 +97,10 @@ class DistinctCountUtil {
         if (solverStatistics != null) solverStatistics.iterationCounter += 1;
         double lambda = 1;
         double eta = 0;
-        double phi = b[uMax];
-        double psi = 0;
-
         double y = x; // x could be +inf, if a was 0
         int u = uMax;
+        double phi = b[uMax];
+        double psi = 0;
         while (true) {
           u -= 1;
           double yPlus2 = 2. + y; // is +inf, if x = +inf
@@ -108,17 +111,17 @@ class DistinctCountUtil {
                   + (1.
                       - z); // eta is increasing and will never overflow as the number of iterations
           // is limited, eta <= 2^(uMax-u+1)-1
-          double t = b[u] * lambda;
-          phi += t;
-          psi += t * eta;
+          double bLambda = b[u] * lambda;
+          phi += bLambda;
+          psi += bLambda * eta;
           if (u <= uMin) break;
           y *= yPlus2;
         }
 
-        double xPrime = aPow * x;
+        double xPrime = aPowUMax * x;
         if (!(phi > xPrime)) break;
-        double eps = (phi - xPrime) / (psi + xPrime);
         double oldX = x;
+        double eps = (phi - xPrime) / (psi + xPrime);
         x += x * eps;
         if (eps <= relativeErrorLimit || !(x > oldX)) break;
       }
@@ -150,10 +153,10 @@ class DistinctCountUtil {
    * denotes the token parameter which must be in the range [1,26].
    *
    * <p>Implementations of this interface must ensure that the iteration over tokens is ordered,
-   * which means that tokens with the same most significant bits are output one after the other and
-   * not interleaved with tokens with different most significant bits. However, it is allowed to
-   * output invalid tokens at any time as it is expected that they are ignored during later
-   * processing. See {@link #isValidToken(int, int)} for a definition of a valid token.
+   * which means that tokens with the same most significant v bits are output one after the other
+   * and not interleaved with tokens where the most significant v bits are different. However, it is
+   * allowed to output invalid tokens at any time as it is expected that they are ignored during
+   * later processing. See {@link #isValidToken(int, int)} for a definition of a valid token.
    */
   interface TokenIterable {
 
@@ -193,34 +196,33 @@ class DistinctCountUtil {
    * significant 6 bits does not exceed (64 - v) where v denotes the token parameter.
    *
    * @param token the token
-   * @param token the token parameter, must be in the range [1,26]
+   * @param v the token parameter, must be in the range [1,26]
    * @return true, if the token is valid
    */
-  static boolean isValidToken(int token, int tokenParameter) {
+  static boolean isValidToken(int token, int v) {
     int nlz = token & 0x3f;
-    return ((token >>> 6 >>> tokenParameter) == 0) && (nlz <= 64 - tokenParameter);
+    return ((token >>> 6 >>> v) == 0) && (nlz <= 64 - v);
   }
 
   private static final int INVALID_TOKEN_INDEX = 0xFFFFFFFF;
 
   /**
-   * Estimates the distinct count from a sorted list of tokens.
+   * Estimates the distinct count from tokens .
    *
    * @param tokenIterable an iterable over the sorted list of tokens
    * @return the estimated distinct count
    */
-  static double estimateDistinctCountFromSortedTokens(
-      TokenIterable tokenIterable, int tokenParameter) {
-    return estimateDistinctCountFromSortedTokens(tokenIterable, tokenParameter, null);
+  static double estimateDistinctCountFromTokens(TokenIterable tokenIterable, int v) {
+    return estimateDistinctCountFromTokens(tokenIterable, v, null);
   }
 
-  static double estimateDistinctCountFromSortedTokens(
-      TokenIterable tokenIterable, int tokenParameter, SolverStatistics solverStatistics) {
+  static double estimateDistinctCountFromTokens(
+      TokenIterable tokenIterable, int v, SolverStatistics solverStatistics) {
     requireNonNull(tokenIterable);
 
     TokenIterator tokenIterator = tokenIterable.iterator();
 
-    int maxNlzInTokenMinus1 = 63 - tokenParameter;
+    int maxNlzInTokenMinus1 = 63 - v;
     long z = 1L << maxNlzInTokenMinus1;
 
     long a = 0; // corresponds to 2^64
@@ -231,14 +233,15 @@ class DistinctCountUtil {
     int maxNonZeroIndex = -1;
     while (tokenIterator.hasNext()) {
       int token = tokenIterator.nextToken();
-      if (!isValidToken(token, tokenParameter)) continue;
+      if (!isValidToken(token, v)) continue;
       int idx = token >>> 6;
       if (currentIdx != idx) {
         currentFlags = 0;
         currentIdx = idx;
       }
       long mask = (1L << token);
-      if ((currentFlags & mask) == 0L) {
+      if ((currentFlags & mask)
+          == 0L) { // deduplication of tokens with same most significant v bits
         currentFlags |= mask;
         int j = Math.min(token & 0x3f, maxNlzInTokenMinus1);
         b[j] += 1;
@@ -248,7 +251,7 @@ class DistinctCountUtil {
     }
 
     if (maxNonZeroIndex < 0) {
-      // implies that all b[i] are zero
+      // implies that all b[j] are zero
       return 0;
     }
     return DistinctCountUtil.solveMaximumLikelihoodEquation(
@@ -257,7 +260,7 @@ class DistinctCountUtil {
             maxNonZeroIndex,
             0.,
             solverStatistics)
-        * pow2(tokenParameter + 1);
+        * pow2(v + 1);
   }
 
   static double unsignedLongToDouble(long l) {

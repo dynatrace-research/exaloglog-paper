@@ -215,8 +215,7 @@ class DistinctCountUtilTest {
         };
   }
 
-  private static void testEstimationFromTokens(
-      int distinctCount, int tokenParameter, double maxErrorInPercent) {
+  private static void testEstimationFromTokens(int distinctCount, int v, double maxErrorInPercent) {
 
     PseudoRandomGenerator prg = PseudoRandomGeneratorProvider.splitMix64_V1().create();
     prg.reset(0L);
@@ -226,13 +225,12 @@ class DistinctCountUtilTest {
 
     for (int i = 0; i < numIterations; ++i) {
       for (int c = 0; c < distinctCount; ++c) {
-        tokens[c] = DistinctCountUtil.computeToken(prg.nextLong(), tokenParameter);
+        tokens[c] = DistinctCountUtil.computeToken(prg.nextLong(), v);
       }
       Arrays.sort(tokens);
 
       double estimate =
-          DistinctCountUtil.estimateDistinctCountFromSortedTokens(
-              fromSortedArray(tokens), tokenParameter);
+          DistinctCountUtil.estimateDistinctCountFromTokens(fromSortedArray(tokens), v);
       assertThat(estimate).isCloseTo(distinctCount, Percentage.withPercentage(maxErrorInPercent));
     }
   }
@@ -243,10 +241,10 @@ class DistinctCountUtilTest {
     double[] maxErrorInPercentValues = {4, 2.5, 1, 1, 1, 1};
     int[] distinctCounts = {1, 2, 3, 5, 10, 100, 1000, 10000, 100000, 1000000, 10000000};
     for (int i = 0; i < tokenParameters.length; ++i) {
-      int tokenParameter = tokenParameters[i];
+      int v = tokenParameters[i];
       double maxErrorInPercent = maxErrorInPercentValues[i];
       for (int distinctCount : distinctCounts) {
-        testEstimationFromTokens(distinctCount, tokenParameter, maxErrorInPercent);
+        testEstimationFromTokens(distinctCount, v, maxErrorInPercent);
       }
     }
   }
@@ -272,33 +270,31 @@ class DistinctCountUtilTest {
 
   @Test
   void testEstimationFromZeroTokens() {
-    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
-      double estimate =
-          DistinctCountUtil.estimateDistinctCountFromSortedTokens(getTestTokens(0), tokenParameter);
+    for (int v = V_MIN; v <= V_MAX; ++v) {
+      double estimate = DistinctCountUtil.estimateDistinctCountFromTokens(getTestTokens(0), v);
       assertThat(estimate).isZero();
     }
   }
 
-  private static int getMaxValidToken(int tokenParameter) {
-    return (int) (((0xFFFFFFFFFFFFFFFFL >>> -tokenParameter) << 6) + 64 - tokenParameter);
+  private static int getMaxValidToken(int v) {
+    return (int) (((0xFFFFFFFFFFFFFFFFL >>> -v) << 6) + 64 - v);
   }
 
   @Test
   void testEstimationFromAllTokens() {
-    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
+    for (int v = V_MIN; v <= V_MAX; ++v) {
       double estimate =
-          DistinctCountUtil.estimateDistinctCountFromSortedTokens(
-              getTestTokens(getMaxValidToken(tokenParameter) + 1), tokenParameter);
+          DistinctCountUtil.estimateDistinctCountFromTokens(
+              getTestTokens(getMaxValidToken(v) + 1), v);
       assertThat(estimate).isInfinite();
     }
   }
 
   @Test
   void testEstimationFromAlmostAllTokens() {
-    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
+    for (int v = V_MIN; v <= V_MAX; ++v) {
       double estimate =
-          DistinctCountUtil.estimateDistinctCountFromSortedTokens(
-              getTestTokens(getMaxValidToken(tokenParameter)), tokenParameter);
+          DistinctCountUtil.estimateDistinctCountFromTokens(getTestTokens(getMaxValidToken(v)), v);
       assertThat(estimate).isFinite().isGreaterThan(1e19);
     }
   }
@@ -310,19 +306,17 @@ class DistinctCountUtilTest {
 
     int numCycles = 100;
 
-    for (int tokenParameter = V_MIN; tokenParameter <= V_MAX; ++tokenParameter) {
+    for (int v = V_MIN; v <= V_MAX; ++v) {
 
-      for (int nlz = 0; nlz <= 64 - tokenParameter; ++nlz) {
+      for (int nlz = 0; nlz <= 64 - v; ++nlz) {
 
         for (int i = 0; i < numCycles; ++i) {
           long hash = random.nextLong();
-          int token = DistinctCountUtil.computeToken(hash, tokenParameter);
-          long reconstructedHash = DistinctCountUtil.reconstructHash(token, tokenParameter);
-          int tokenFromReconstructedHash =
-              DistinctCountUtil.computeToken(reconstructedHash, tokenParameter);
+          int token = DistinctCountUtil.computeToken(hash, v);
+          long reconstructedHash = DistinctCountUtil.reconstructHash(token, v);
+          int tokenFromReconstructedHash = DistinctCountUtil.computeToken(reconstructedHash, v);
           assertThat(reconstructedHash)
-              .isEqualTo(
-                  hash | (((0xFFFFFFFFFFFFFFFFL >>> tokenParameter >>> token) << tokenParameter)));
+              .isEqualTo(hash | (((0xFFFFFFFFFFFFFFFFL >>> v >>> token) << v)));
           assertThat(tokenFromReconstructedHash).isEqualTo(token);
         }
       }

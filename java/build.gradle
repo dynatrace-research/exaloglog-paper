@@ -27,7 +27,7 @@
 plugins {
 	id 'java'
 	id 'jacoco'
-	id 'me.champeau.jmh' version '0.7.2'
+	id 'me.champeau.jmh' version '0.7.3'
 }
 
 repositories {
@@ -35,13 +35,13 @@ repositories {
 }
 
 dependencies {
-	implementation 'com.dynatrace.hash4j:hash4j:0.19.0'
+	implementation 'com.dynatrace.hash4j:hash4j:0.20.0'
 	implementation group: 'org.hipparchus', name: 'hipparchus-stat', version: '3.1'
 	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.11.4'
-	testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.26.3'
+	testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.27.3'
 	testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.11.4'
-	implementation group: 'org.apache.datasketches', name: 'datasketches-java', version:'6.1.1'
-	implementation group: 'org.apache.datasketches', name: 'datasketches-memory', version:'3.0.2'
+	implementation group: 'org.apache.datasketches', name: 'datasketches-java', version:'7.0.1'
+	implementation group: 'org.apache.datasketches', name: 'datasketches-memory', version:'5.0.0'
 	implementation group: 'org.openjdk.jol', name: 'jol-core', version: '0.17'
 	testImplementation group: 'com.google.guava', name: 'guava', version: '33.4.0-jre'
 }
@@ -75,13 +75,15 @@ jmh {
 	warmup = '1s'
 	iterations = 20
 	resultFormat = 'JSON'
+	jvmArgs = ["--enable-preview"]
 }
 
 
 task runEmpiricalMVPComputation(type: JavaExec) {
 	classpath = sourceSets.test.runtimeClasspath
 	mainClass = 'com.dynatrace.exaloglogpaper.EmpiricalMVPComputation'
-	jvmArgs '-Xmx16g'
+	jvmArgs = ['-Xmx16g', "--enable-preview"]
+
 
 	outputs.files "../results/comparison-empirical-mvp/Apache Data Sketches Java CPC (p = 12).csv",
 			"../results/comparison-empirical-mvp/Apache Data Sketches Java HLL4 (p = 13).csv",
@@ -157,7 +159,7 @@ task "simulateEstimationErrors" {
 }
 
 jacoco {
-	toolVersion = '0.8.11'
+	toolVersion = '0.8.12'
 }
 
 jacocoTestReport {

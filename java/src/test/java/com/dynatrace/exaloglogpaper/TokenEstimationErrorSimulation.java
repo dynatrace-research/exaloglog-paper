@@ -69,7 +69,7 @@ public class TokenEstimationErrorSimulation {
   }
 
   public static void main(String[] args) {
-    int tokenParameter = Integer.parseInt(args[0]);
+    int v = Integer.parseInt(args[0]);
     String outputFile = args[1];
 
     // parameters
@@ -117,16 +117,14 @@ public class TokenEstimationErrorSimulation {
 
                               while (trueDistinctCount < targetDistinctCount) {
                                 tokens[tokenCounter++] =
-                                    DistinctCountUtil.computeToken(prg.nextLong(), tokenParameter);
+                                    DistinctCountUtil.computeToken(prg.nextLong(), v);
                                 trueDistinctCount += 1;
                               }
                               Arrays.sort(tokens, 0, tokenCounter);
                               SolverStatistics solverStatistics = new SolverStatistics();
                               estimatedDistinctCounts[distinctCountIndex][i] =
-                                  DistinctCountUtil.estimateDistinctCountFromSortedTokens(
-                                      fromSortedArray(tokens, tokenCounter),
-                                      tokenParameter,
-                                      solverStatistics);
+                                  DistinctCountUtil.estimateDistinctCountFromTokens(
+                                      fromSortedArray(tokens, tokenCounter), v, solverStatistics);
                               numIterations[distinctCountIndex][i] =
                                   solverStatistics.iterationCounter;
                             }
@@ -137,7 +135,7 @@ public class TokenEstimationErrorSimulation {
     }
 
     try (FileWriter writer = new FileWriter(outputFile, StandardCharsets.UTF_8)) {
-      writer.write("token_parameter=" + tokenParameter + "; num_cycles=" + numCycles + "\n");
+      writer.write("token_parameter=" + v + "; num_cycles=" + numCycles + "\n");
 
       writer.write("distinct count");
       writer.write("; relative bias");
